@@ -10,13 +10,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.gatherloop.gamemasterbell.receiver.R
 import com.gatherloop.gamemasterbell.receiver.ui.theme.ReceiverAndroidTheme
 
 @Composable
 fun StatusScreen(
     notificationsGranted: Boolean,
+    topicSubscribed: Boolean?,
     onRequestNotificationPermission: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -41,6 +44,14 @@ fun StatusScreen(
             },
             style = MaterialTheme.typography.bodyLarge,
         )
+        Text(
+            text = when (topicSubscribed) {
+                true -> stringResource(R.string.topic_subscribed)
+                false -> stringResource(R.string.topic_subscribe_failed)
+                null -> stringResource(R.string.topic_subscribing)
+            },
+            style = MaterialTheme.typography.bodyLarge,
+        )
         if (!notificationsGranted) {
             Button(onClick = onRequestNotificationPermission) {
                 Text("Aktifkan notifikasi")
@@ -53,7 +64,7 @@ fun StatusScreen(
 @Composable
 private fun StatusScreenNotificationsGrantedPreview() {
     ReceiverAndroidTheme {
-        StatusScreen(notificationsGranted = true, onRequestNotificationPermission = {})
+        StatusScreen(notificationsGranted = true, topicSubscribed = true, onRequestNotificationPermission = {})
     }
 }
 
@@ -61,6 +72,6 @@ private fun StatusScreenNotificationsGrantedPreview() {
 @Composable
 private fun StatusScreenNotificationsNotGrantedPreview() {
     ReceiverAndroidTheme {
-        StatusScreen(notificationsGranted = false, onRequestNotificationPermission = {})
+        StatusScreen(notificationsGranted = false, topicSubscribed = null, onRequestNotificationPermission = {})
     }
 }
