@@ -1,0 +1,25 @@
+{
+  "name": "@game-master-bell/bell-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm --filter @game-master-bell/shared build",
+    "dev": "vite",
+    "prebuild": "pnpm --filter @game-master-bell/shared build",
+    "build": "vite build && node scripts/generate-table-pages.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@game-master-bell/shared": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "vite": "^8.1.5"
+  }
+}
