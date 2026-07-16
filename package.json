@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "Game Master Bell for Gatherloop Board Game Cafe",
+  "type": "module",
   "engines": {
     "node": ">=22"
   },
@@ -14,14 +15,23 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --build",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "pregenerate-qr": "pnpm --filter @game-master-bell/shared build",
+    "generate-qr": "tsx scripts/generate-qr.ts"
+  },
+  "dependencies": {
+    "@game-master-bell/shared": "workspace:*",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@types/node": "^22.19.0",
+    "@types/qrcode": "^1.5.5",
     "eslint": "^9.19.0",
     "eslint-config-prettier": "^10.0.1",
     "firebase-tools": "^15.24.0",
     "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0"
   }

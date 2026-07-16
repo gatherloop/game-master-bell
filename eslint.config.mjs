@@ -16,7 +16,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    files: ["**/scripts/**/*.mjs", "**/*.config.{js,mjs,ts}"],
+    files: ["**/scripts/**/*.{mjs,ts}", "**/*.config.{js,mjs,ts}"],
     languageOptions: {
       globals: {
         console: "readonly",

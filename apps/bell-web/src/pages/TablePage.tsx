@@ -33,6 +33,7 @@ export function TablePage({ table }: { table: Table }) {
         }
         role="status"
       >
+        {state.status === "calling" && <span className="table-page__spinner" aria-hidden="true" />}
         {statusMessage(state)}
       </p>
     </main>

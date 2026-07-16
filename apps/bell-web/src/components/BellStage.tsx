@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Application, Container, Graphics } from "pixi.js";
+import { playBellTapFeedback } from "../lib/bellFeedback";
 import "./BellStage.css";
 
 const IDLE_SWAY_SPEED = 1.4; // rad/s (angular frequency of the sine wave)
@@ -77,6 +78,7 @@ function mountBellScene(
       { graphic: makeWave(), spawnAt: elapsed },
       { graphic: makeWave(), spawnAt: elapsed + WAVE_STAGGER },
     );
+    playBellTapFeedback();
     onTap?.();
   }
 
@@ -163,6 +165,7 @@ export function BellStage({ onTap, disabled = false }: { onTap?: () => void; dis
   onTapRef.current = onTap;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -185,6 +188,7 @@ export function BellStage({ onTap, disabled = false }: { onTap?: () => void; dis
           () => onTapRef.current?.(),
           () => disabledRef.current,
         );
+        setIsReady(true);
       })
       .catch(() => {
         // Canvas/WebGL unavailable — leave the host empty rather than crash the page.
@@ -199,5 +203,14 @@ export function BellStage({ onTap, disabled = false }: { onTap?: () => void; dis
     };
   }, []);
 
-  return <div ref={hostRef} className="bell-stage" role="img" aria-label="Bel game master" />;
+  return (
+    <div className="bell-stage-wrap">
+      <div ref={hostRef} className="bell-stage" role="img" aria-label="Bel game master" />
+      {!isReady && (
+        <div className="bell-stage__loading" aria-hidden="true">
+          <span className="bell-stage__spinner" />
+        </div>
+      )}
+    </div>
+  );
 }
