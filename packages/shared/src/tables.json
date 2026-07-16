@@ -1,0 +1,12 @@
+[
+  { "code": "1-01", "floor": 1, "number": "01", "displayName": "Meja 01", "active": true },
+  { "code": "1-02", "floor": 1, "number": "02", "displayName": "Meja 02", "active": true },
+  { "code": "1-03", "floor": 1, "number": "03", "displayName": "Meja 03", "active": true },
+  { "code": "1-04", "floor": 1, "number": "04", "displayName": "Meja 04", "active": true },
+  { "code": "2-01", "floor": 2, "number": "01", "displayName": "Meja 01", "active": true },
+  { "code": "2-02", "floor": 2, "number": "02", "displayName": "Meja 02", "active": true },
+  { "code": "2-03", "floor": 2, "number": "03", "displayName": "Meja 03", "active": true },
+  { "code": "2-04", "floor": 2, "number": "04", "displayName": "Meja 04", "active": true },
+  { "code": "2-05", "floor": 2, "number": "05", "displayName": "Meja 05", "active": true },
+  { "code": "2-06", "floor": 2, "number": "06", "displayName": "Meja 06", "active": false }
+]
