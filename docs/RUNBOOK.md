@@ -1,7 +1,14 @@
 # Runbook — Deploys & Operations
 
 Operational reference for shipping changes and running day-to-day tasks for
-Game Master Bell. See `docs/PRD.md` for product context.
+Game Master Bell. See `docs/PRD-v2.md` for the current architecture (`docs/PRD.md`
+is the superseded v1 spec, kept for history).
+
+As of PRD v2 phase B2, the production call path is the self-hosted **call
+API** (`gatherloop/game-master-bell-api`, deployed to our VPS), not the
+Firebase notify function. The Firebase path (`functions/`, this repo) is kept
+idle as a rollback option until PRD v2 phase B3 removes it — see "Rollback"
+below.
 
 ---
 
@@ -10,9 +17,8 @@ Game Master Bell. See `docs/PRD.md` for product context.
 - Node.js 22 (`.nvmrc` pins the version) and pnpm 10 (`packageManager` in
   `package.json` — run via `corepack enable` or install pnpm directly).
 - `pnpm install` at the repo root before running anything.
-- A Firebase project on the **Blaze plan** (required for Cloud Functions,
-  though usage stays inside the free quota at cafe scale — see NFR-4) with
-  the Firebase CLI logged in: `pnpm exec firebase login`.
+- Only needed for the idle Firebase rollback path: a Firebase project on the
+  **Blaze plan** with the Firebase CLI logged in: `pnpm exec firebase login`.
 
 ---
 
@@ -23,9 +29,10 @@ Game Master Bell. See `docs/PRD.md` for product context.
 but hasn't been added to this repo yet — `.github/workflows/` is empty. Until
 that lands, publish a build by hand:
 
-1. Set `VITE_NOTIFY_FUNCTION_URL` to the deployed notify function's URL for
-   the production build (copy `apps/bell-web/.env.example` to
-   `apps/bell-web/.env.local` and fill it in, or export it in the shell).
+1. Set `VITE_CALL_API_URL` to the deployed call API's `/call` endpoint (e.g.
+   `https://bell-api.gatherloop.id/call`) for the production build (copy
+   `apps/bell-web/.env.example` to `apps/bell-web/.env.local` and fill it in,
+   or export it in the shell).
 2. Build and generate the per-table static pages:
    ```sh
    pnpm --filter @game-master-bell/bell-web build
@@ -45,11 +52,22 @@ that lands, publish a build by hand:
 
 **Follow-up:** replacing this manual step with the GitHub Actions workflow
 from PRD phase 3 is the natural next piece of work — track it as its own PR
-rather than folding it into an unrelated change.
+rather than folding it into an unrelated change. When that workflow exists,
+`VITE_CALL_API_URL` should be set as a repository/environment variable the
+workflow passes into the build, per PRD v2 phase B2.
 
 ---
 
-## Deploying the notify function (`functions/`)
+## Rollback: reverting to the Firebase notify function (`functions/`)
+
+Until PRD v2 phase B3 deletes `functions/`, falling back to the v1 Firebase
+path is a one-variable change (PRD v2 §7 "Rollback"): point
+`VITE_CALL_API_URL` back at the deployed Cloud Function's URL and redeploy
+Pages (step 1 of the previous section). Staff keep the Android app installed
+as a fallback receiver until the new receiver PWA is verified on every staff
+device.
+
+To (re)deploy the Firebase notify function itself:
 
 1. Select the target Firebase project (first time only):
    ```sh
@@ -60,17 +78,14 @@ rather than folding it into an unrelated change.
    pnpm --filter @game-master-bell/functions build
    pnpm exec firebase deploy --only functions
    ```
-3. Confirm the deployed HTTPS URL matches what `apps/bell-web`'s
-   `VITE_NOTIFY_FUNCTION_URL` points at (see previous section) — copy the URL
-   printed by the deploy command if it changed.
-4. Sanity-check with a real call:
+3. Sanity-check with a real call:
    ```sh
    curl -i -X POST "<deployed-url>" \
      -H "Content-Type: application/json" \
      -d '{"tableCode":"2-05"}'
    ```
    Expect `200 OK`; an unknown code should 404 (FR-F1).
-5. Check logs for the call (FR-F3):
+4. Check logs for the call (FR-F3):
    ```sh
    pnpm exec firebase functions:log
    ```
@@ -116,6 +131,11 @@ reprinting its QR sticker — only re-running `generate-qr` when a table's
 
 ## Android app distribution (`apps/receiver-android`)
 
+As of PRD v2 phase B2, the receiver PWA (`gatherloop/game-master-bell-receiver`)
+is the primary receiver on staff devices; this Android app is kept installed
+only as a fallback for the Firebase rollback path above until PRD v2 phase B3
+removes it from this repo.
+
 Staff devices are a handful, so v1 ships as a **sideloaded APK** rather than
 a Play Store listing (PRD open question #4):
 
@@ -146,7 +166,7 @@ manual sideloading painful.
 
 | Symptom | Likely cause |
 |---|---|
-| Bell tap shows "Panggilan gagal, coba lagi" | Notify function URL misconfigured/unreachable, or CORS origin mismatch (FR-F4) — check the browser console and `firebase functions:log`. |
+| Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (or `firebase functions:log` if running against the Firebase rollback path). |
 | Table page 404s for a real table | `tables.json` entry missing/inactive, or the web app wasn't rebuilt after a `tables.json` change (static pages are generated at build time, not runtime). |
-| No push received on a game master phone | Device not subscribed to the `game-masters` topic, notification permission not granted, or `google-services.json` still the placeholder — see `apps/receiver-android/README.md`. |
+| No push received on a game master phone | For the primary receiver PWA, see that repo's runbook (subscription state, passcode, VAPID key). For the Android fallback: device not subscribed to the `game-masters` topic, notification permission not granted, or `google-services.json` still the placeholder — see `apps/receiver-android/README.md`. |
 | QR sticker leads to the 404 page | Table code was deactivated or renamed in `tables.json` without reprinting — regenerate with `pnpm generate-qr` and reprint that table's sticker. |
