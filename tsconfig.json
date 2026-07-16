@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/shared" },
     { "path": "apps/bell-web" },
-    { "path": "functions" }
+    { "path": "functions" },
+    { "path": "scripts" }
   ]
 }
