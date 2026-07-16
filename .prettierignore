@@ -1,0 +1,7 @@
+node_modules
+dist
+build
+.firebase
+pnpm-lock.yaml
+apps/receiver-android
+*.md
