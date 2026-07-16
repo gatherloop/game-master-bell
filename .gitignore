@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+lib/
 *.tsbuildinfo
 .DS_Store
 *.log
@@ -8,3 +9,5 @@ build/
 .env.local
 .firebase/
 firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
