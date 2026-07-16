@@ -5,10 +5,12 @@ Game Master Bell. See `docs/PRD-v2.md` for the current architecture (`docs/PRD.m
 is the superseded v1 spec, kept for history).
 
 As of PRD v2 phase B2, the production call path is the self-hosted **call
-API** (`gatherloop/game-master-bell-api`, deployed to our VPS), not the
-Firebase notify function. The Firebase path (`functions/`, this repo) is kept
-idle as a rollback option until PRD v2 phase B3 removes it — see "Rollback"
-below.
+API** (`gatherloop/game-master-bell-api`, deployed to our VPS). As of phase
+B3, the old Firebase notify function and native Android receiver have been
+removed from this repo entirely — this repo is now bell-app-only. The
+receiver PWA lives in `gatherloop/game-master-bell-receiver` and the call API
+in `gatherloop/game-master-bell-api`; see those repos' runbooks for their
+deploy/ops instructions.
 
 ---
 
@@ -17,8 +19,6 @@ below.
 - Node.js 22 (`.nvmrc` pins the version) and pnpm 10 (`packageManager` in
   `package.json` — run via `corepack enable` or install pnpm directly).
 - `pnpm install` at the repo root before running anything.
-- Only needed for the idle Firebase rollback path: a Firebase project on the
-  **Blaze plan** with the Firebase CLI logged in: `pnpm exec firebase login`.
 
 ---
 
@@ -58,47 +58,6 @@ workflow passes into the build, per PRD v2 phase B2.
 
 ---
 
-## Rollback: reverting to the Firebase notify function (`functions/`)
-
-Until PRD v2 phase B3 deletes `functions/`, falling back to the v1 Firebase
-path is a one-variable change (PRD v2 §7 "Rollback"): point
-`VITE_CALL_API_URL` back at the deployed Cloud Function's URL and redeploy
-Pages (step 1 of the previous section). Staff keep the Android app installed
-as a fallback receiver until the new receiver PWA is verified on every staff
-device.
-
-To (re)deploy the Firebase notify function itself:
-
-1. Select the target Firebase project (first time only):
-   ```sh
-   pnpm exec firebase use --add
-   ```
-2. Build and deploy:
-   ```sh
-   pnpm --filter @game-master-bell/functions build
-   pnpm exec firebase deploy --only functions
-   ```
-3. Sanity-check with a real call:
-   ```sh
-   curl -i -X POST "<deployed-url>" \
-     -H "Content-Type: application/json" \
-     -d '{"tableCode":"2-05"}'
-   ```
-   Expect `200 OK`; an unknown code should 404 (FR-F1).
-4. Check logs for the call (FR-F3):
-   ```sh
-   pnpm exec firebase functions:log
-   ```
-   or via the Cloud Console → Cloud Functions → Logs.
-
-Before deploying, it's worth running the emulator-backed test suite locally:
-
-```sh
-pnpm --filter @game-master-bell/functions test:emulator
-```
-
----
-
 ## Generating and printing table QR codes
 
 Each table's QR code just encodes the URL of its generated page
@@ -129,44 +88,11 @@ reprinting its QR sticker — only re-running `generate-qr` when a table's
 
 ---
 
-## Android app distribution (`apps/receiver-android`)
-
-As of PRD v2 phase B2, the receiver PWA (`gatherloop/game-master-bell-receiver`)
-is the primary receiver on staff devices; this Android app is kept installed
-only as a fallback for the Firebase rollback path above until PRD v2 phase B3
-removes it from this repo.
-
-Staff devices are a handful, so v1 ships as a **sideloaded APK** rather than
-a Play Store listing (PRD open question #4):
-
-1. Configure `app/google-services.json` with the real Firebase project (see
-   `apps/receiver-android/README.md`).
-2. Build an APK:
-   ```sh
-   cd apps/receiver-android
-   ./gradlew assembleDebug
-   ```
-   The `release` build type has no signing config yet, so `assembleRelease`
-   produces an unsigned APK that Android won't install — sideloading uses
-   the auto-signed debug build for now. Add a proper release signing config
-   before distributing outside the cafe's own staff devices.
-3. Distribute `app/build/outputs/apk/debug/app-debug.apk` to game master
-   phones directly (AirDrop-equivalent, USB, or an internal file share) and
-   install with "unknown sources" allowed for the install source.
-4. On first launch, grant the notification permission prompt and confirm the
-   status screen shows the device subscribed to the `game-masters` topic
-   (FR-D1).
-
-Revisit the Play Store internal track if staff turnover or device count make
-manual sideloading painful.
-
----
-
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
-| Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (or `firebase functions:log` if running against the Firebase rollback path). |
+| Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (`gatherloop/game-master-bell-api`). |
 | Table page 404s for a real table | `tables.json` entry missing/inactive, or the web app wasn't rebuilt after a `tables.json` change (static pages are generated at build time, not runtime). |
-| No push received on a game master phone | For the primary receiver PWA, see that repo's runbook (subscription state, passcode, VAPID key). For the Android fallback: device not subscribed to the `game-masters` topic, notification permission not granted, or `google-services.json` still the placeholder — see `apps/receiver-android/README.md`. |
+| No push received on a game master phone | See the receiver PWA's runbook (`gatherloop/game-master-bell-receiver`) for subscription state, passcode, and VAPID key troubleshooting. |
 | QR sticker leads to the 404 page | Table code was deactivated or renamed in `tables.json` without reprinting — regenerate with `pnpm generate-qr` and reprint that table's sticker. |

@@ -1,9 +1,4 @@
 {
   "files": [],
-  "references": [
-    { "path": "packages/shared" },
-    { "path": "apps/bell-web" },
-    { "path": "functions" },
-    { "path": "scripts" }
-  ]
+  "references": [{ "path": "packages/shared" }, { "path": "apps/bell-web" }, { "path": "scripts" }]
 }

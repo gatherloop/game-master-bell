@@ -2,13 +2,8 @@ node_modules/
 dist/
 build/
 /qr-codes/
-/functions/lib/
 *.tsbuildinfo
 .DS_Store
 *.log
 .env
 .env.local
-.firebase/
-firebase-debug.log
-firebase-debug.*.log
-ui-debug.log
