@@ -14,12 +14,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.gatherloop.gamemasterbell.receiver.fcm.GAME_MASTERS_TOPIC
+import com.gatherloop.gamemasterbell.receiver.fcm.ensureCallNotificationChannel
 import com.gatherloop.gamemasterbell.receiver.ui.StatusScreen
 import com.gatherloop.gamemasterbell.receiver.ui.theme.ReceiverAndroidTheme
+import com.google.firebase.Firebase
+import com.google.firebase.messaging.messaging
 
 class MainActivity : ComponentActivity() {
 
     private var notificationsGranted by mutableStateOf(false)
+    private var topicSubscribed by mutableStateOf<Boolean?>(null)
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -30,11 +35,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         notificationsGranted = hasNotificationPermission()
 
+        ensureCallNotificationChannel(this)
+        subscribeToGameMastersTopic()
+
         setContent {
             ReceiverAndroidTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     StatusScreen(
                         notificationsGranted = notificationsGranted,
+                        topicSubscribed = topicSubscribed,
                         onRequestNotificationPermission = {
                             requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         },
@@ -47,6 +56,11 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         notificationsGranted = hasNotificationPermission()
+    }
+
+    private fun subscribeToGameMastersTopic() {
+        Firebase.messaging.subscribeToTopic(GAME_MASTERS_TOPIC)
+            .addOnCompleteListener { task -> topicSubscribed = task.isSuccessful }
     }
 
     private fun hasNotificationPermission(): Boolean {
