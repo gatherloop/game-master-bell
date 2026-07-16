@@ -4,13 +4,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 
 export default tseslint.config(
   {
-    ignores: [
-      "**/dist/**",
-      "**/build/**",
-      "**/node_modules/**",
-      "**/.firebase/**",
-      "apps/receiver-android/**",
-    ],
+    ignores: ["**/dist/**", "**/build/**", "**/node_modules/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
