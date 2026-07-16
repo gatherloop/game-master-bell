@@ -272,41 +272,72 @@ keeps its own per-device recent-calls list in IndexedDB.
 
 ## 7. Implementation Phases
 
-Each phase is a **single, small, reviewable PR** in the repo indicated.
-Ordering keeps every repo green and demoable after each merge, and the
-production system keeps running on the v1 Firebase path until phase 10
-flips the switch — so there is no downtime window.
+Each repo has its own phase track — **A** (API), **R** (receiver PWA),
+**B** (bell, this repo) — since each repo has its own CI, reviewers, and
+release cadence. Every phase is a **single, small, reviewable PR** that
+leaves its repo green and demoable. The production system keeps running on
+the v1 Firebase path until B2 flips the switch, so there is no downtime
+window.
 
-| # | Repo | PR | Scope | Demoable outcome |
-|---|---|---|---|---|
-| **1** | bell (this) | Adopt PRD v2 | This document; mark v1 PRD superseded for architecture. | Agreed plan on `main`. |
-| **2** | api (new) | API scaffold & CI | Node 22 + TS + Fastify skeleton, `GET /healthz`, lint/typecheck/test CI, Dockerfile + Compose file, VPS deploy doc (TLS via reverse proxy). | `https://<api-host>/healthz` returns 200 from the VPS. |
-| **3** | api | Table sync + `POST /call` (validation only) | Port `handler.ts` validation + tests from this repo's `functions/`; tables.json fetch-at-startup with disk cache and hourly refresh; push send stubbed as a log line. | `curl /call` → 200 for a real code, 404 unknown, 400 malformed. |
-| **4** | api | Subscription store + endpoints | SQLite via `better-sqlite3`, `POST`/`DELETE /subscriptions` with passcode gate, `GET /vapid-key`, VAPID keygen script + env wiring. | A subscription posted with `curl` lands in the DB; wrong passcode → 401. |
-| **5** | api | Web Push fan-out | Wire `/call` to `web-push` sends across all stored subscriptions (concurrent, per-send logging), 404/410 auto-prune. | Bell-less test: `curl /call` rings a real browser subscribed by hand via devtools. |
-| **6** | receiver (new) | PWA scaffold & deploy | Vite + TS app shell, manifest + icons, empty service worker, GitHub Pages deploy workflow, CI. | Installable PWA live on its Pages URL. |
-| **7** | receiver | Subscribe flow | Permission prompt → passcode input → `pushManager.subscribe` (key from `GET /vapid-key`) → register with API; status screen shows subscription state; unsubscribe action (FR-R1, FR-R4). | Status screen shows "subscribed" on a real phone; row visible in API DB. |
-| **8** | receiver | Notification handling | Service worker `push` → notification with table/floor + vibration, `notificationclick` focus (FR-R2). | Bell tap (or `curl /call`) rings the phone with correct table/floor — new path works end to end. |
-| **9** | receiver | Recent-calls list | Persist pushes to IndexedDB, render recent-calls list on the status screen (FR-R3). | Game master reviews recent calls on the device. |
-| **10** | bell (this) | Cut over the bell | Rename env var to `VITE_CALL_API_URL`, point the Pages workflow's variable at the VPS API, update RUNBOOK. | Production customer flow runs entirely on the new stack; Firebase path idle. |
-| **11** | bell (this) | Remove Firebase & Android | Delete `functions/`, `apps/receiver-android/`, `firebase.json`, `firebase-tools` dep; prune workspace config, CI (drop the Gradle job), README/RUNBOOK. | Slim bell-only repo, CI green. |
-| **12** | api | Decommission & runbook | Ops PR: document Firebase project deletion + billing closure, uptime monitoring for `/healthz`, passcode rotation procedure. | Firebase console empty; monitoring live. |
+### API repo (`game-master-bell-api`)
 
-**Parallelization:** after phase 2, the API track (3→4→5) and the receiver
-scaffold (6) can proceed in parallel; phase 7 needs 4, phase 8 needs 5+7.
-Phases 10–12 are strictly sequential (verify, then cut, then delete).
+| # | PR | Scope | Demoable outcome |
+|---|---|---|---|
+| **A1** | API scaffold & CI | Node 22 + TS + Fastify skeleton, `GET /healthz`, lint/typecheck/test CI, Dockerfile + Compose file, VPS deploy doc (TLS via reverse proxy). | `https://<api-host>/healthz` returns 200 from the VPS. |
+| **A2** | Table sync + `POST /call` (validation only) | Port `handler.ts` validation + tests from the bell repo's `functions/`; tables.json fetch-at-startup with disk cache and hourly refresh; push send stubbed as a log line. | `curl /call` → 200 for a real code, 404 unknown, 400 malformed. |
+| **A3** | Subscription store + endpoints | SQLite via `better-sqlite3`, `POST`/`DELETE /subscriptions` with passcode gate, `GET /vapid-key`, VAPID keygen script + env wiring. | A subscription posted with `curl` lands in the DB; wrong passcode → 401. |
+| **A4** | Web Push fan-out | Wire `/call` to `web-push` sends across all stored subscriptions (concurrent, per-send logging), 404/410 auto-prune. | Bell-less test: `curl /call` rings a real browser subscribed by hand via devtools. |
+| **A5** | Decommission & runbook | Ops PR: document Firebase project deletion + billing closure, uptime monitoring for `/healthz`, passcode rotation procedure. | Firebase console empty; monitoring live. |
 
-**Rollback:** until phase 11 merges, rolling back is a one-variable change —
-point `VITE_CALL_API_URL`/`VITE_NOTIFY_FUNCTION_URL` back at the still-deployed
-Cloud Function and redeploy Pages. Staff keep the Android app installed until
-phase 8 is verified on every staff device.
+### Receiver repo (`game-master-bell-receiver`)
+
+| # | PR | Scope | Demoable outcome |
+|---|---|---|---|
+| **R1** | PWA scaffold & deploy | Vite + TS app shell, manifest + icons, empty service worker, GitHub Pages deploy workflow, CI. | Installable PWA live on its Pages URL. |
+| **R2** | Subscribe flow | Permission prompt → passcode input → `pushManager.subscribe` (key from `GET /vapid-key`) → register with API; status screen shows subscription state; unsubscribe action (FR-R1, FR-R4). | Status screen shows "subscribed" on a real phone; row visible in API DB. |
+| **R3** | Notification handling | Service worker `push` → notification with table/floor + vibration, `notificationclick` focus (FR-R2). | Bell tap (or `curl /call`) rings the phone with correct table/floor — new path works end to end. |
+| **R4** | Recent-calls list | Persist pushes to IndexedDB, render recent-calls list on the status screen (FR-R3). | Game master reviews recent calls on the device. |
+
+### Bell repo (this repo, `game-master-bell`)
+
+| # | PR | Scope | Demoable outcome |
+|---|---|---|---|
+| **B1** | Adopt PRD v2 | This document; mark v1 PRD superseded for architecture. | Agreed plan on `main`. |
+| **B2** | Cut over the bell | Rename env var to `VITE_CALL_API_URL`, point the Pages workflow's variable at the VPS API, update RUNBOOK. | Production customer flow runs entirely on the new stack; Firebase path idle. |
+| **B3** | Remove Firebase & Android | Delete `functions/`, `apps/receiver-android/`, `firebase.json`, `firebase-tools` dep; prune workspace config, CI (drop the Gradle job), README/RUNBOOK. | Slim bell-only repo, CI green. |
+
+### Cross-repo ordering
+
+Within each track, phases are sequential. Across tracks, only these
+dependencies exist:
+
+```mermaid
+flowchart LR
+    B1 --> A1 --> A2 --> A3 --> A4
+    B1 --> R1 --> R2 --> R3 --> R4
+    A3 --> R2
+    A4 --> R3
+    R3 --> B2 --> B3 --> A5
+```
+
+- **R2 needs A3** (subscription endpoints must exist) and **R3 needs A4**
+  (fan-out must send real pushes) — otherwise the API track (A1→A4) and the
+  receiver track (R1→R4) proceed in parallel.
+- **B2 waits for R3** verified end-to-end on every staff device; **B3**
+  (delete old code) follows the cutover, and **A5** (Firebase
+  decommission) comes last, once nothing references the old path.
+
+**Rollback:** until B3 merges, rolling back is a one-variable change —
+point `VITE_CALL_API_URL`/`VITE_NOTIFY_FUNCTION_URL` back at the
+still-deployed Cloud Function and redeploy Pages. Staff keep the Android
+app installed until R3 is verified on every staff device.
 
 ---
 
 ## 8. Open Questions
 
 1. **API domain** — which hostname on the VPS (e.g. `bell-api.gatherloop.id`)?
-   Needed before phase 2's deploy step; CORS and the Pages variable depend
+   Needed before A1's deploy step; CORS and the Pages variable depend
    on it.
 2. **Staff passcode UX** — type once and store in the PWA (localStorage) vs.
    re-enter on resubscribe? Assumed: store locally after first entry.
