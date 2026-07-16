@@ -14,17 +14,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.gatherloop.gamemasterbell.receiver.data.Call
+import com.gatherloop.gamemasterbell.receiver.data.CallsRepository
 import com.gatherloop.gamemasterbell.receiver.fcm.GAME_MASTERS_TOPIC
 import com.gatherloop.gamemasterbell.receiver.fcm.ensureCallNotificationChannel
 import com.gatherloop.gamemasterbell.receiver.ui.StatusScreen
 import com.gatherloop.gamemasterbell.receiver.ui.theme.ReceiverAndroidTheme
 import com.google.firebase.Firebase
 import com.google.firebase.messaging.messaging
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private var notificationsGranted by mutableStateOf(false)
     private var topicSubscribed by mutableStateOf<Boolean?>(null)
+    private var recentCalls by mutableStateOf<List<Call>>(emptyList())
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -37,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
         ensureCallNotificationChannel(this)
         subscribeToGameMastersTopic()
+        observeRecentCalls()
 
         setContent {
             ReceiverAndroidTheme {
@@ -44,6 +52,7 @@ class MainActivity : ComponentActivity() {
                     StatusScreen(
                         notificationsGranted = notificationsGranted,
                         topicSubscribed = topicSubscribed,
+                        recentCalls = recentCalls,
                         onRequestNotificationPermission = {
                             requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                         },
@@ -61,6 +70,15 @@ class MainActivity : ComponentActivity() {
     private fun subscribeToGameMastersTopic() {
         Firebase.messaging.subscribeToTopic(GAME_MASTERS_TOPIC)
             .addOnCompleteListener { task -> topicSubscribed = task.isSuccessful }
+    }
+
+    private fun observeRecentCalls() {
+        val repository = CallsRepository.getInstance(this)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.recentCalls().collect { calls -> recentCalls = calls }
+            }
+        }
     }
 
     private fun hasNotificationPermission(): Boolean {
