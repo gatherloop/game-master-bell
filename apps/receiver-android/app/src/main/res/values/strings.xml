@@ -12,4 +12,7 @@
     <string name="topic_subscribed">Berlangganan panggilan game master</string>
     <string name="topic_subscribe_failed">Gagal berlangganan panggilan — periksa koneksi internet</string>
     <string name="topic_subscribing">Menyambungkan…</string>
+
+    <string name="recent_calls_title">Panggilan terakhir</string>
+    <string name="recent_calls_empty">Belum ada panggilan</string>
 </resources>

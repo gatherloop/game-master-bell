@@ -10,18 +10,43 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.gatherloop.gamemasterbell.receiver.MainActivity
 import com.gatherloop.gamemasterbell.receiver.R
+import com.gatherloop.gamemasterbell.receiver.data.CallsRepository
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Receives calls pushed to the `game-masters` topic and shows a high-priority
- * notification with the table/floor content (FR-D2).
+ * notification with the table/floor content (FR-D2), persisting each call so
+ * the status screen can list recent calls (FR-D3).
  */
 class GameMasterMessagingService : FirebaseMessagingService() {
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
         showCallNotification(message)
+        recordCall(message)
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
+    }
+
+    private fun recordCall(message: RemoteMessage) {
+        val tableCode = message.data["tableCode"] ?: return
+        val floor = message.data["floor"] ?: return
+        val number = message.data["number"] ?: return
+        val calledAt = message.data["calledAt"]
+
+        val repository = CallsRepository.getInstance(this)
+        serviceScope.launch { repository.recordCall(tableCode, floor, number, calledAt) }
     }
 
     private fun showCallNotification(message: RemoteMessage) {

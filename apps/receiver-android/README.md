@@ -4,6 +4,10 @@ Android app that game masters keep open on their phone. Subscribes to the
 `game-masters` FCM topic and shows a high-priority notification with the
 table/floor whenever a customer taps the bell (see `docs/PRD.md` §5.3).
 
+Each received call is also persisted locally with Room and shown as a
+recent-calls list on the status screen (FR-D3), so a game master can see
+what was called while they were away from the phone.
+
 ## Firebase setup
 
 `app/google-services.json` in this repo is a **placeholder** pointing at the
