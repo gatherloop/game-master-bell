@@ -1,7 +1,7 @@
 # PRD — Game Master Bell
 
 **Product:** Game Master Bell for Gatherloop Board Game Cafe
-**Status:** Draft v1.3 (Firestore removed — the stack is GitHub Pages + one Cloud Function + FCM)
+**Status:** v1.3 — **superseded by `PRD-v2.md` for architecture** (self-hosted API + Web Push PWA replace the Cloud Function + FCM + Android app). Product behavior described here still applies.
 **Last updated:** 2026-07-16
 
 ---
