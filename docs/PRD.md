@@ -1,7 +1,7 @@
 # PRD — Game Master Bell
 
 **Product:** Game Master Bell for Gatherloop Board Game Cafe
-**Status:** Draft v1.2 (GitHub Pages hosting; direct HTTPS call to the notify function, Firestore reduced to optional audit log)
+**Status:** Draft v1.3 (Firestore removed — the stack is GitHub Pages + one Cloud Function + FCM)
 **Last updated:** 2026-07-16
 
 ---
@@ -22,7 +22,7 @@ Customers at Gatherloop board game cafe often need help from a game master (rule
 - No customer accounts, ordering, or payment features.
 - No two-way chat between customer and game master.
 - No iOS receiver app (game masters use Android; can be revisited later).
-- No analytics dashboard (the Firestore call log is queryable ad-hoc; dashboard is a future iteration).
+- No call history or analytics — no database at all in v1. Cloud Functions' built-in request logs cover basic debugging; a proper call log/dashboard is a future iteration.
 
 ---
 
@@ -46,7 +46,7 @@ Customers at Gatherloop board game cafe often need help from a game master (rule
 | Customer taps the bell repeatedly | Client-side cooldown (e.g. 60s): the bell is disabled with a countdown after a successful call. Physical access to the cafe is required to know real table URLs, so abuse risk is low; Firebase App Check can be added later if needed. |
 | No network / request fails | Bell shows an error state ("Panggilan gagal, coba lagi") and allows retry immediately. |
 | Invalid/unknown table code in URL | Friendly error page asking the customer to re-scan or call staff manually (lookup against bundled `tables.json`; the function re-validates server-side). |
-| No game master device subscribed | Call is still sent and logged; the customer still sees the confirmation. Operational alerting is a future concern. |
+| No game master device subscribed | The topic send still succeeds (delivers to zero devices); the customer still sees the confirmation. Operational alerting is a future concern. |
 | Old QR code / renamed table | Table codes are stable identifiers; QR stickers only encode the code, so metadata (floor label, name) can change in `tables.json` without reprinting. |
 
 ---
@@ -67,7 +67,7 @@ Two apps plus one serverless function live in this monorepo:
 |---|---|---|
 | **FCM** | Delivers the push notification to game master phones (topic `game-masters`) | Yes — the core delivery channel, free and unlimited |
 | **Cloud Functions** | One HTTPS endpoint the web app calls on bell tap; holds the server credentials FCM requires and performs the send | Yes — FCM sends need server credentials that must never ship in a public web app |
-| **Firestore** | **Optional audit log only.** The function writes one document per call (server-side) so operations can answer "what calls happened last night?". Not in the critical path; can be dropped without affecting the product | Optional |
+| **Firestore** | Not used — no database in v1. Each call is a stateless request → push; Cloud Functions' request logs suffice for debugging | No |
 | **Firebase Hosting** | Not used — the web app is a static bundle deployed to **GitHub Pages** via GitHub Actions | No |
 
 ### Architecture
@@ -77,7 +77,6 @@ sequenceDiagram
     participant C as Customer phone (browser)
     participant W as Bell web app (GitHub Pages)
     participant FN as Cloud Function (HTTPS)
-    participant FS as Firestore (audit log, optional)
     participant FCM as Firebase Cloud Messaging
     participant G as Game master Android app
 
@@ -87,7 +86,6 @@ sequenceDiagram
     W->>FN: POST /call { tableCode }
     FN->>FN: Validate tableCode (shared tables data)
     FN->>FCM: Send to "game-masters" topic
-    FN->>FS: Write call log document
     FN-->>W: 200 OK
     W-->>C: "Game master akan segera datang membantumu"
     FCM->>G: Push notification (table + floor)
@@ -124,7 +122,7 @@ GitHub Pages only serves static files, so a deep link like `/t/2-05` has no serv
 | Trigger | HTTPS endpoint `POST /call` with CORS allowing the GitHub Pages origin | Matches the mental model: bell tap → function → FCM. No database in the critical path. |
 | Validation | Table codes validated against the shared tables data (`packages/shared`) | Same source of truth as the web app; unknown codes get 404. |
 | Push | **firebase-admin SDK → FCM topic send** | Official server SDK; single send reaches all subscribed staff devices. |
-| Audit | One Firestore document written per call (server-side), including the FCM delivery result | Optional; client has zero Firestore access (rules deny all). |
+| Observability | Cloud Functions' built-in request/error logs | No database; enough to debug delivery issues at this scale. |
 
 ### Receiver Android app (game master) — suggestion
 
@@ -156,7 +154,7 @@ GitHub Pages only serves static files, so a deep link like `/t/2-05` has no serv
 
 - **FR-F1** — `POST /call` accepts `{ "tableCode": string }`, validates it against the shared tables data (404 for unknown/inactive codes), and rejects malformed bodies (400).
 - **FR-F2** — On a valid call, sends one FCM message to the `game-masters` topic with title (e.g. "Panggilan Game Master"), body (e.g. "Meja 05 · Lantai 2 memanggil game master"), and data fields `tableCode`, `floor`, `number`, `calledAt`.
-- **FR-F3** — Writes one audit document to Firestore per call (table code, timestamp, FCM delivery result). Firestore security rules deny all client access; only the function (admin SDK) writes.
+- **FR-F3** — Logs each call (table code, outcome, FCM message id or error) via structured function logging, visible in the Firebase/Cloud console.
 - **FR-F4** — CORS allows only the GitHub Pages origin (plus localhost for development).
 
 ### 5.3 Receiver Android app
@@ -173,12 +171,14 @@ GitHub Pages only serves static files, so a deep link like `/t/2-05` has no serv
 - **NFR-1 Latency** — End-to-end (bell tap → notification on game master phone) under ~5 seconds under normal network conditions (a cold-started function may add 1–2s occasionally).
 - **NFR-2 Availability** — GitHub Pages + Firebase managed availability; the bell must fail gracefully when offline.
 - **NFR-3 Security** — The web app is public by design (physical QR). Server credentials live only in the function. The function validates table codes and restricts CORS to the app's origin. Client-side cooldown limits accidental spam; Firebase App Check is the escalation path if abuse ever appears.
-- **NFR-4 Cost** — FCM is free and unlimited; GitHub Pages is free; function + Firestore usage at one-cafe scale fits Firebase's free quotas (Blaze plan required, expected bill $0, budget alert configured).
+- **NFR-4 Cost** — FCM is free and unlimited; GitHub Pages is free; function usage at one-cafe scale fits Firebase's free quotas (Blaze plan required, expected bill $0, budget alert configured).
 - **NFR-5 Maintainability** — Monorepo with shared TypeScript types and table data (`packages/shared`) used by both the web app and the function; CI runs lint, typecheck, and tests on every PR.
 
 ---
 
 ## 7. Data Model (v1)
+
+There is no database. The only persistent data is `tables.json`, versioned in the repo:
 
 ### `tables.json` (in `packages/shared`, bundled into the web app and the function)
 
@@ -192,17 +192,6 @@ GitHub Pages only serves static files, so a deep link like `/t/2-05` has no serv
     "active": true
   }
 ]
-```
-
-### Firestore `calls` collection (optional audit log, written only by the function)
-
-```
-calls/{autoId}
-  tableCode   string     -- "2-05"
-  floor       number     -- 2
-  number      string     -- "05"
-  calledAt    timestamp
-  fcmResult   string     -- message id / error
 ```
 
 ---
@@ -219,8 +208,7 @@ game-master-bell/
 ├── functions/               # Firebase Cloud Functions (TS): POST /call → FCM
 ├── packages/
 │   └── shared/              # tables.json + shared TS types (API contract, table schema)
-├── firebase.json            # Functions + Firestore rules config
-├── firestore.rules          # Deny-all (clients never touch Firestore)
+├── firebase.json            # Functions config
 └── .github/workflows/       # CI + GitHub Pages deploy
 ```
 
@@ -238,7 +226,7 @@ Each phase is scoped to be a **single, small, reviewable PR**. Phases are ordere
 | **2** | Bell web app scaffold + `tables.json` | Vite + React + TS app in `apps/bell-web`, `tables.json` in `packages/shared` with schema validation at build time, per-table static page generation, static placeholder bell (no Pixi yet), styled 404 page. | Open `/t/2-05/` locally and see the table's placeholder page; bad codes show the 404 page. |
 | **3** | GitHub Pages deploy workflow | Actions workflow building `apps/bell-web` and deploying to GitHub Pages on merge to `main`, correct Vite `base` path. | The placeholder app is live on the public GitHub Pages URL. |
 | **4** | PixiJS bell scene | Pixi canvas integration, bell sprite with idle animation and tap animation (no networking). Isolated in a `BellStage` component. | The bell looks and feels game-like on tap. |
-| **5** | Notify Cloud Function | `functions/` workspace: HTTPS `POST /call` with validation from shared tables data, FCM topic send, Firestore audit write, deny-all `firestore.rules`, CORS config, emulator-based tests. | `curl` the function (emulator) → topic message visible; unknown codes 404. |
+| **5** | Notify Cloud Function | `functions/` workspace: HTTPS `POST /call` with validation from shared tables data, FCM topic send, structured logging, CORS config, emulator-based tests. | `curl` the function (emulator) → topic message visible; unknown codes 404. |
 | **6** | Wire bell to function | `fetch` hook calling `POST /call`, success state ("Game master akan segera datang membantumu"), 60s cooldown countdown, error state per FR-W5–W6, function URL via env config. | Full customer flow works end-to-end from the deployed page. |
 | **7** | Android app scaffold | Gradle + Kotlin + Compose project in `apps/receiver-android`, single status screen, notification permission request, CI job for `assembleDebug`. No FCM yet. | App installs and shows the status screen. |
 | **8** | Android FCM receive | google-services config, `game-masters` topic subscription, `FirebaseMessagingService`, high-priority notification channel with table/floor content. | Bell tap on the web triggers a notification on a real phone — full end-to-end flow. |
@@ -255,4 +243,3 @@ Each phase is scoped to be a **single, small, reviewable PR**. Phases are ordere
 2. Should there be an **acknowledge** action ("I'm on it") so other game masters know a call is taken? Deferred to v2 — requires two-way state and possibly showing status to the customer.
 3. Exact **cooldown duration** (60s assumed) — to be validated with cafe operations.
 4. Play Store internal track vs. **sideloaded APK** for staff devices — affects Phase 10 docs only.
-5. Keep or drop the **Firestore audit log**? Kept for now (one server-side write per call, free at this scale); dropping it removes Firestore entirely.
