@@ -22,7 +22,11 @@
   font-size: 2rem;
 }
 
-.table-page__hint {
+.table-page__message {
   margin-top: 1.5rem;
   color: var(--color-muted);
+}
+
+.table-page__message--error {
+  color: var(--color-error);
 }
