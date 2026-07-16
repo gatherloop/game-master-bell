@@ -10,7 +10,7 @@ export type BellCallState =
   | { status: "cooldown"; secondsRemaining: number }
   | { status: "error" };
 
-/** Drives the bell tap → notify function call → success/error/cooldown flow (FR-W4–W6). */
+/** Drives the bell tap → call API request → success/error/cooldown flow (FR-W4–W6). */
 export function useBellCall(tableCode: string) {
   const [state, setState] = useState<BellCallState>({ status: "idle" });
   const intervalRef = useRef<number | undefined>(undefined);
