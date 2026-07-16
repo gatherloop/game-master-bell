@@ -43,7 +43,11 @@ function makeWave(): Graphics {
 
 type Wave = { graphic: Graphics; spawnAt: number };
 
-function mountBellScene(app: Application, onTap: (() => void) | undefined) {
+function mountBellScene(
+  app: Application,
+  onTap: (() => void) | undefined,
+  isDisabled: () => boolean,
+) {
   const root = new Container();
   root.label = "bell-root";
   app.stage.addChild(root);
@@ -67,7 +71,7 @@ function mountBellScene(app: Application, onTap: (() => void) | undefined) {
   const activeWaves: Wave[] = [];
 
   function ring() {
-    if (ringStart !== null) return;
+    if (isDisabled() || ringStart !== null) return;
     ringStart = elapsed;
     pendingWaves.push(
       { graphic: makeWave(), spawnAt: elapsed },
@@ -86,6 +90,10 @@ function mountBellScene(app: Application, onTap: (() => void) | undefined) {
 
   const tick = () => {
     elapsed += app.ticker.deltaMS / 1000;
+
+    const disabled = isDisabled();
+    bell.cursor = disabled ? "default" : "pointer";
+    root.alpha = disabled ? 0.6 : 1;
 
     for (let i = pendingWaves.length - 1; i >= 0; i -= 1) {
       const wave = pendingWaves[i];
@@ -149,10 +157,12 @@ function mountBellScene(app: Application, onTap: (() => void) | undefined) {
   };
 }
 
-export function BellStage({ onTap }: { onTap?: () => void }) {
+export function BellStage({ onTap, disabled = false }: { onTap?: () => void; disabled?: boolean }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const onTapRef = useRef(onTap);
   onTapRef.current = onTap;
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -170,7 +180,11 @@ export function BellStage({ onTap }: { onTap?: () => void }) {
           return;
         }
         host.appendChild(app.canvas);
-        cleanupScene = mountBellScene(app, () => onTapRef.current?.());
+        cleanupScene = mountBellScene(
+          app,
+          () => onTapRef.current?.(),
+          () => disabledRef.current,
+        );
       })
       .catch(() => {
         // Canvas/WebGL unavailable — leave the host empty rather than crash the page.
