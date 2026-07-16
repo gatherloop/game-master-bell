@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@game-master-bell/shared": "workspace:*",
+    "pixi.js": "^8.19.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

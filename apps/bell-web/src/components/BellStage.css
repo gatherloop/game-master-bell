@@ -1,0 +1,13 @@
+.bell-stage {
+  width: 16rem;
+  height: 16rem;
+  max-width: 80vw;
+  max-height: 80vw;
+  touch-action: manipulation;
+}
+
+.bell-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
