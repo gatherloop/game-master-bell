@@ -1,0 +1,14 @@
+[Unit]
+Description=Game Master Bell API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/projects/game-master-bell/apps/api
+EnvironmentFile=/root/projects/game-master-bell/apps/api/.env
+ExecStart=/bin/bash -c 'export NVM_DIR=/root/.nvm; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm use; exec node dist/server.js'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

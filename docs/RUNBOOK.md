@@ -1,16 +1,24 @@
 # Runbook — Deploys & Operations
 
 Operational reference for shipping changes and running day-to-day tasks for
-Game Master Bell. See `docs/PRD-v2.md` for the current architecture (`docs/PRD.md`
-is the superseded v1 spec, kept for history).
+Game Master Bell. See `docs/PRD-v3.md` for the current architecture
+(`docs/PRD-v2.md` and `docs/PRD.md` are the superseded v2/v1 specs, kept for
+history).
 
-As of PRD v2 phase B2, the production call path is the self-hosted **call
-API** (`gatherloop/game-master-bell-api`, deployed to our VPS). As of phase
-B3, the old Firebase notify function and native Android receiver have been
-removed from this repo entirely — this repo is now bell-app-only. The
-receiver PWA lives in `gatherloop/game-master-bell-receiver` and the call API
-in `gatherloop/game-master-bell-api`; see those repos' runbooks for their
-deploy/ops instructions.
+As of PRD-v3 phase 2, the production call path is the self-hosted **call
+API** at `apps/api` in this repo, moved in from the standalone
+`gatherloop/game-master-bell-api` repo (see [apps/api/README.md](../apps/api/README.md),
+[apps/api/docs/DEPLOY.md](../apps/api/docs/DEPLOY.md)/[DEPLOY_NATIVE.md](../apps/api/docs/DEPLOY_NATIVE.md)
+for deploy instructions, and [apps/api/docs/RUNBOOK.md](../apps/api/docs/RUNBOOK.md)
+for API-specific ops). The old `game-master-bell-api` repo's deploy workflow
+is kept active as a rollback path until the monorepo-triggered deploy is
+verified on the VPS, per PRD-v3's migration plan.
+
+The receiver PWA still lives in `gatherloop/game-master-bell-receiver` and
+keeps receiving Web Push from its own repo/deploy until every staff phone
+runs the native Android receiver (a later PRD-v3 phase, landing at
+`apps/receiver-android` in this repo); see that repo's runbook for its
+deploy/ops instructions until then.
 
 ---
 
@@ -96,7 +104,7 @@ reprinting its QR sticker — only re-running `generate-qr` when a table's
 
 | Symptom | Likely cause |
 |---|---|
-| Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (`gatherloop/game-master-bell-api`). |
+| Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (`apps/api`, see [apps/api/docs/DEPLOY_NATIVE.md](../apps/api/docs/DEPLOY_NATIVE.md) for `journalctl` commands). |
 | Table page 404s for a real table | `tables.json` entry missing/inactive, or the web app wasn't rebuilt after a `tables.json` change (static pages are generated at build time, not runtime). |
 | No push received on a game master phone | See the receiver PWA's runbook (`gatherloop/game-master-bell-receiver`) for subscription state, passcode, and VAPID key troubleshooting. |
 | QR sticker leads to the 404 page | Table code was deactivated or renamed in `tables.json` without reprinting — regenerate with `pnpm generate-qr` and reprint that table's sticker. |

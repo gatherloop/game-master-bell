@@ -10,7 +10,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
   {
-    files: ["**/scripts/**/*.{mjs,ts}", "**/*.config.{js,mjs,ts}"],
+    files: ["**/scripts/**/*.{mjs,ts}", "**/*.config.{js,mjs,ts}", "apps/api/**/*.ts"],
     languageOptions: {
       globals: {
         console: "readonly",
