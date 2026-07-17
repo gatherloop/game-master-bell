@@ -1,8 +1,9 @@
-# PRD v3 — Game Master Bell: Native Android Receiver
+# PRD v3 — Game Master Bell: Native Android Receiver, Back to a Monorepo
 
 **Product:** Game Master Bell for Gatherloop Board Game Cafe
-**Status:** Draft v3.0 (supersedes `PRD-v2.md` for the receiver and push
-delivery; the self-hosted API and bell web app of v2 are kept)
+**Status:** Draft v3.1 (supersedes `PRD-v2.md` for the receiver, push
+delivery, and repository layout; the self-hosted API and bell web app of v2
+are kept)
 **Last updated:** 2026-07-17
 
 ---
@@ -27,16 +28,18 @@ default chime.
 
 **v3 therefore brings back the native Android receiver app** (resurrected
 from the v1 code in this repo's git history) with a distinctive custom bell
-sound, while keeping everything else from v2:
+sound, and **consolidates everything back into this monorepo**:
 
 | Concern | v2 (current) | v3 (this PRD) |
 |---|---|---|
-| Bell web app | GitHub Pages, `POST /call` | **Unchanged** |
-| Call endpoint | Self-hosted Node.js API on our VPS | **Unchanged** (same host, same contract) |
+| Bell web app | GitHub Pages, `POST /call` | **Unchanged** (already in this repo) |
+| Call endpoint | Self-hosted Node.js API on our VPS, own repo | **Same API, same VPS** — code moves to `apps/api` in this repo |
 | Push delivery | Web Push (VAPID), subscriptions in SQLite | **FCM topic send** from the same API |
-| Receiver | PWA (`game-master-bell-receiver`) | **Native Android app** (same repo, replacing the PWA) |
+| Receiver | PWA (`game-master-bell-receiver` repo) | **Native Android app** at `apps/receiver-android` in this repo |
 | Notification sound | Browser/system default | **Custom bell sound** via a notification channel |
 | Server state | `subscriptions` table + staff passcode | **None** — topic fan-out is stateless |
+| Repos | Three (`game-master-bell`, `-api`, `-receiver`) | **One monorepo** (this repo); the other two archived after migration |
+| Table data flow | API fetches `tables.json` over HTTP hourly, disk cache | **Direct workspace import** — sync module deleted |
 
 ### Do we need FCM? — Yes. Here's why.
 
@@ -65,6 +68,31 @@ didn't own. None of that returns:
   trade one push broker for another, and gain custom sounds, topic fan-out
   (no subscription state), and delivery that survives Doze.
 
+### Why undo the v2 repo split
+
+v2 split into three repos for "independent lifecycles, CI, and access
+control". In practice, for one small team, the split bought overhead
+instead:
+
+- **Cross-repo coordination.** v2's phase plan needed a dependency graph
+  across repos (R2-needs-A3, etc.); every contract change is two PRs that
+  must land in order. In one repo it's one atomic PR.
+- **The tables sync module exists only because of the split.** The API
+  fetches `tables.json` from this repo's raw GitHub URL, caches it on disk,
+  and refreshes hourly — fetch, cache, refresh timer, failure handling,
+  `TABLES_URL`/`TABLES_CACHE_PATH`/`TABLES_REFRESH_INTERVAL_MS` config, and
+  tests for all of it. In a monorepo the API imports `packages/shared`
+  directly at build time and all of that is deleted. A table edit
+  propagates by triggering the API deploy workflow (minutes, atomic)
+  instead of "within an hour, if the fetch succeeds".
+- **Access control never mattered** — same people everywhere.
+- v1 was already this monorepo (web app + function + Android side by side);
+  the layout is proven here.
+
+The cost is workflow hygiene: CI and deploy jobs get `paths:` filters so a
+bell-web change doesn't rebuild the Android app or redeploy the API. That's
+a few lines of YAML, paid once.
+
 ### Goals
 
 - **A bell call sounds like a bell.** Unmistakable custom sound, heads-up
@@ -72,20 +100,24 @@ didn't own. None of that returns:
 - Zero regression in the customer flow: bell web app and `POST /call`
   contract untouched; end-to-end latency stays under ~5s (NFR-1 since v1).
 - Reuse over rewrite: resurrect the reviewed v1 Android app from git
-  history; keep the v2 API and only swap its delivery module.
-- Simplify the API: topic fan-out removes the subscriptions table, the
-  staff passcode, and the VAPID key management.
+  history; move the v2 API code as-is and only swap its delivery module.
+- Simplify: one repo, no tables-sync module, no subscriptions table, no
+  staff passcode, no VAPID key management.
 - Zero-downtime migration: Web Push and FCM run side by side until every
-  staff phone runs the native app, then the Web Push path is deleted.
+  staff phone runs the native app; the deployed PWA and API keep working
+  throughout.
 
 ### Non-Goals (v3)
 
 - No new product features — no acknowledge action, no on/off duty, no
   customer-facing call status (deferred since v1).
 - No iOS receiver. Staff phones are Android (standing assumption).
-- No Play Store listing. A handful of staff devices; signed APK
-  distribution (sideload) as in v1.
+- **No Play Store.** The APK is distributed directly to staff phones
+  (sideload), as in v1 — see §3.3; the custom sound does not depend on the
+  distribution channel in any way.
 - No multi-cafe / multi-tenant support.
+- No git-history surgery: API code moves into the monorepo as plain files;
+  its history stays readable in the archived `game-master-bell-api` repo.
 
 ---
 
@@ -107,7 +139,7 @@ sequenceDiagram
     W->>W: Look up tableCode in bundled tables.json
     C->>W: Tap bell
     W->>API: POST /call { tableCode }
-    API->>API: Validate tableCode (synced tables data)
+    API->>API: Validate tableCode (tables.json compiled in)
     API->>FCM: Data message to "game-masters" topic (high priority)
     API-->>W: 200 OK
     W-->>C: "Game master akan segera datang membantumu"
@@ -119,20 +151,37 @@ reaches every subscribed device in one call, so the API stores nothing about
 receivers. The v2 `subscriptions` table, passcode gate, and dead-subscription
 pruning all become unnecessary and are deleted at the end of the migration.
 
-### Repository roles (unchanged split, new contents)
+### Monorepo layout (target)
 
-| Repo | v3 contents | Hosting / deploy |
+```
+game-master-bell/
+├── docs/                    # PRDs, RUNBOOK
+├── apps/
+│   ├── bell-web/            # customer bell (unchanged)
+│   ├── api/                 # call API — moved from game-master-bell-api
+│   └── receiver-android/    # Kotlin + Compose + FCM — resurrected from v1 history
+├── packages/
+│   └── shared/              # tables.json + types, imported by bell-web AND api
+├── scripts/                 # QR generation
+└── .github/workflows/       # path-filtered: pages deploy, api deploy (SSH), android CI/release
+```
+
+`apps/bell-web` and `apps/api` are pnpm workspace packages;
+`apps/receiver-android` is a standard Gradle project alongside the workspace
+(exactly as in v1). Deploy targets are unchanged: bell-web → GitHub Pages,
+api → the same VPS via the same SSH deploy workflow (moved here with a
+`paths:` filter on `apps/api/**` + `packages/shared/**` — the latter is how
+table edits now reach production).
+
+### Fate of the other repos
+
+| Repo | During migration | End state |
 |---|---|---|
-| `gatherloop/game-master-bell` (this repo) | Bell web app, `packages/shared` (tables.json + types), QR script, docs (this PRD) | GitHub Pages via Actions (unchanged) |
-| `gatherloop/game-master-bell-api` | Call API: `POST /call` validation + **FCM topic send** | VPS (unchanged deploy) |
-| `gatherloop/game-master-bell-receiver` | **Native Android receiver app** (Kotlin/Compose + FCM); the PWA lives here until decommissioned | Signed APK via GitHub Releases (Actions); Pages deploy removed with the PWA |
+| `game-master-bell-api` | Its `main` stays deployable as rollback until the monorepo deploy is verified; its deploy workflow is then disabled so the VPS has exactly one deploy source | **Archived** (read-only, history preserved) |
+| `game-master-bell-receiver` | The PWA stays deployed and receiving Web Push from its own repo, untouched, until every staff phone runs the native app | **Archived**; its Pages site taken down |
 
-The Android app starts from the v1 code preserved in this repo's history
-(`apps/receiver-android` as of the commit before "Phase B3: remove Firebase
-and Android", `077b508^`) — a reviewed, working Kotlin + Jetpack Compose +
-FCM app with a status screen, Room-backed recent-calls list, and the
-"Panggilan Meja" notification channel. v3's delta on top of it is the custom
-sound, data-only message handling, and a new Firebase project wiring.
+The PWA is never imported into the monorepo — it's end-of-life; only the
+native app takes its place.
 
 ### Firebase project
 
@@ -141,29 +190,31 @@ one (Spark plan, FCM only, no billing):
 
 - **App side:** `google-services.json` in the Android project (safe to
   commit — it contains identifiers, not secrets; same stance as v1).
-- **API side:** a service-account JSON (roles/firebase messaging scope) on
-  the VPS, referenced by env var — handled exactly like the VAPID private
-  key it replaces.
+- **API side:** a service-account JSON (Firebase messaging scope) on the
+  VPS, referenced by env var — handled exactly like the VAPID private key
+  it replaces.
 
 ---
 
 ## 3. Components
 
-### 3.1 Bell web app (this repo) — no changes
+### 3.1 Bell web app (`apps/bell-web`) — no changes
 
 `VITE_CALL_API_URL`, the `POST /call` contract, copy, cooldown — all
-untouched. v3 requires no PR against the bell app.
+untouched. v3 requires no changes to the bell app.
 
-### 3.2 Call API (`game-master-bell-api`) — swap the delivery module
+### 3.2 Call API (`apps/api`, moved into this repo)
 
 | Concern | Choice | Rationale |
 |---|---|---|
+| Move | Copy the `game-master-bell-api` source into `apps/api` as a workspace package; port its CI (lint/typecheck/test) and SSH deploy workflow here with `paths:` filters | Same code, same VPS, same secrets (moved to this repo's settings). No behavior change in the move itself. |
+| Table data | **Import `tables.json` from `packages/shared`** at build time; delete the sync module (`src/tables/sync.ts`, disk cache, refresh timer, `TABLES_URL`/`TABLES_CACHE_PATH`/`TABLES_REFRESH_INTERVAL_MS`) | The sync existed only to cross the repo boundary (§1). Table edits deploy the API via the workflow's `packages/shared/**` path filter. |
 | FCM sending | **`firebase-admin`** (Messaging only), topic `game-masters` | Official server SDK; one dependency, one `send()` call. Raw HTTP v1 + `google-auth-library` was considered and rejected as hand-rolling what the SDK does. |
 | Message type | **Data-only** message, `android.priority: "high"` | Data-only guarantees `onMessageReceived` runs in every app state, so the app always builds the notification itself on the custom-sound channel. A `notification` block would let the system render it in background/killed state and bypass the app's channel choice. High priority is required to punch through Doze — justified for a human-summoning bell. |
 | Payload | `data: { tableCode, floor, number, calledAt }` (all strings — FCM data values must be strings) | Same fields as v1/v2; title/body strings live in the app (already localized there). |
 | Migration | `/call` fans out to **both** Web Push and FCM until cutover completes | Each staff phone migrates independently; no downtime window. |
-| End state | Delete `web-push`, SQLite store, `POST/DELETE /subscriptions`, `GET /vapid-key`, VAPID + passcode env vars | Topic fan-out is stateless; the API returns to v1's zero-persistent-receiver-state design (tables cache remains). |
-| Config | `FCM_SERVICE_ACCOUNT_PATH` (JSON on the VPS volume), `FCM_TOPIC` (default `game-masters`) | Same secret-handling pattern as the VAPID keys being removed. |
+| End state | Delete `web-push`, SQLite store, `POST/DELETE /subscriptions`, `GET /vapid-key`, VAPID + passcode env vars | Topic fan-out is stateless; the API returns to v1's zero-persistent-receiver-state design (and with the tables cache gone too, the API needs **no data volume at all**). |
+| Config | `FCM_SERVICE_ACCOUNT_PATH` (JSON on the VPS), `FCM_TOPIC` (default `game-masters`) | Same secret-handling pattern as the VAPID keys being removed. |
 
 **Who can receive calls?** Topic subscription happens client-side with no
 server gate — anyone running the APK could subscribe. v1 shipped with
@@ -174,12 +225,12 @@ restores it, so the passcode retires with the PWA. Escalation path if this
 ever changes: passcode-gated FCM *token* registration in the API, reusing
 the v2 store pattern (token instead of subscription).
 
-### 3.3 Receiver Android app (`game-master-bell-receiver`) — the core of v3
+### 3.3 Receiver Android app (`apps/receiver-android`) — the core of v3
 
 | Concern | Choice | Rationale |
 |---|---|---|
 | Language/UI | **Kotlin + Jetpack Compose** (resurrected v1 app) | Reviewed working code beats a rewrite; the app is a status screen + notifications. |
-| Location | Gradle project at `android/` in the receiver repo; PWA stays at the root until decommission, then removed | The repo's identity is "the receiver"; keeps v2's per-repo CI/release-cadence rationale. |
+| Location | `apps/receiver-android`, restored from this repo's own history (the commit before "Phase B3: remove Firebase and Android", `077b508^`) — its original path | The resurrection is a near-verbatim restore; review focuses on the delta (new Firebase project id, version bumps). |
 | Push | FCM topic `game-masters` subscription on first launch | Stateless fan-out; no registration endpoint. |
 | **Custom sound** | Bell sound bundled at `res/raw/bell_call.ogg`, set on the notification channel via `setSound(...)` with `USAGE_NOTIFICATION_EVENT` audio attributes | The whole point of v3. Channel-owned sound plays in background and killed states — no app process needed at alert time. |
 | Channel identity | New channel id **`table_calls_v2`** (name stays "Panggilan Meja"); v1's channel id retired | Android channels are **immutable after creation** — sound can't be changed on an existing channel. Any future sound change means another id bump (`_v3`, …); the app deletes retired ids on startup. |
@@ -187,14 +238,31 @@ the v2 store pattern (token instead of subscription).
 | Message handling | Data-only payload → app composes title/body from `strings.xml` (Indonesian) | Matches the API's data-only sends; works identically in all app states. |
 | Recent calls | Room-backed list on the status screen (from v1) | FR parity with v1 FR-D3 / v2 FR-R3. |
 | Permissions & OEM reality | `POST_NOTIFICATIONS` runtime prompt (Android 13+); status screen surfaces permission/subscription state; runbook covers disabling battery optimization + OEM autostart settings per staff device | High-priority FCM mostly survives Doze, but aggressive OEM managers can still defer it; setup checklist beats debugging it later. |
-| Distribution | CI builds a **signed release APK**, published as a GitHub Release on tag; install/update by sideload | v1's model; a handful of devices doesn't justify Play Store overhead. |
+| **Distribution** | **Direct APK install on staff phones — no Play Store.** CI builds a signed release APK, published as a GitHub Release on tag; installed by sideload ("install unknown apps" permission, one-time per phone) | v1's model; a handful of devices doesn't justify Play Store overhead. See the note below. |
 | Min SDK | API 26 (Android 8.0) | Notification-channels baseline, as in v1. |
 
-### 3.4 Receiver PWA — decommissioned at the end
+**Sideloading and the custom sound.** The custom sound is an ordinary app
+resource registered on a notification channel — it is a property of the
+installed app, not of the distribution channel, so it works identically
+whether the APK arrives via Play Store, a download link, or a USB cable.
+The only things sideloading changes are operational:
 
-The PWA keeps working (and keeps receiving Web Push) throughout the
-migration. Once every staff phone runs the native app, the PWA source, its
-Pages deploy, and the API's Web Push path are deleted in the same window.
+- **Updates are manual.** There's no auto-update; a new version means
+  installing the new APK on each phone (the runbook covers this; a
+  handful of devices makes it a non-issue).
+- **Same signing key every release.** Android only installs an update over
+  an existing app if both are signed with the same key — so the release
+  keystore must be kept safe (CI secret + offline backup). Losing it means
+  uninstall/reinstall (and re-doing channel settings) on every phone.
+- Each phone needs the one-time "install unknown apps" permission for
+  whatever app opens the APK (browser/file manager).
+
+### 3.4 Receiver PWA — end of life
+
+The PWA keeps working (and keeps receiving Web Push) from its own repo
+throughout the migration. Once every staff phone runs the native app, the
+API's Web Push path is deleted, the Pages site is taken down, and the
+`game-master-bell-receiver` repo is archived.
 
 ---
 
@@ -216,6 +284,10 @@ restated. API validation requirements FR-A1 (validate + 400/404), FR-A3
 - **FR-A9** — The API refuses to start without valid FCM credentials
   (mirroring the current VAPID startup check); after cutover the VAPID/
   passcode startup checks are removed with their features.
+- **FR-A10** — The API validates table codes against `tables.json` imported
+  from `packages/shared` at build time; the HTTP sync module and its
+  config are removed. A `tables.json` edit reaches production by triggering
+  the API deploy workflow.
 
 ### 4.2 Receiver Android app
 
@@ -248,27 +320,27 @@ restated. API validation requirements FR-A1 (validate + 400/404), FR-A3
 - **NFR-3 Security** — the FCM service-account JSON lives only in the API's
   environment (replacing the VAPID private key there). `POST /call` stays
   public with client cooldown (v1 stance). Receiver access is gated by APK
-  distribution (§3.2). `google-services.json` in the app repo is
-  non-secret.
+  distribution (§3.2). `google-services.json` in the repo is non-secret.
+  The APK release keystore lives only in CI secrets + an offline backup.
 - **NFR-4 Cost** — unchanged: Pages free, VPS already paid, FCM free (Spark
   plan, **no billing account** — the v1 Blaze requirement came from Cloud
   Functions, which are not used).
-- **NFR-5 Maintainability** — each repo keeps its own CI. The receiver repo
-  gains an Android CI job (`assembleDebug` + lint) and a signed-release
-  workflow; the API's delivery module swap keeps its test suite green with a
-  faked FCM client.
+- **NFR-5 Maintainability** — one repo, one CI, with `paths:`-filtered jobs
+  so each app builds/deploys only on relevant changes. The API's test suite
+  stays green through the move (FCM faked in tests); the Android app gets an
+  `assembleDebug` + lint job.
 - **NFR-6 Sound asset** — the bell sound must be distinctive, short (~2–3s),
   and licensed for redistribution (CC0 or cafe-owned recording); the file
-  and its provenance are committed to the receiver repo.
+  and its provenance are committed to the repo.
 
 ---
 
 ## 6. Data Model
 
-v3 **removes** server-side receiver state:
+v3 **removes** all server-side persistent state:
 
-- **`tables.json`** — unchanged, in `packages/shared` here, synced by the
-  API hourly.
+- **`tables.json`** — unchanged, in `packages/shared`, now compiled into
+  both the bell app and the API (no runtime sync, no disk cache).
 - **`subscriptions` (SQLite)** — deleted with the Web Push path at the end
   of the migration. Until then it keeps serving the PWA fan-out.
 - **Recent calls** — per-device Room database in the Android app (as in v1);
@@ -278,80 +350,70 @@ v3 **removes** server-side receiver state:
 
 ## 7. Implementation Phases
 
-Three tracks — **A** (API repo), **N** (native app, receiver repo), **B**
-(this repo). Every phase is a **single, small, reviewable PR** that leaves
-its repo green and demoable. Production keeps running on the v2 Web Push
-path until the staff migration completes; nothing breaks mid-stream.
-
-### Bell repo (this repo, `game-master-bell`)
-
-| # | PR | Scope | Demoable outcome |
-|---|---|---|---|
-| **B1** | Adopt PRD v3 | This document; mark PRD-v2 superseded for receiver/push architecture; README pointer. | Agreed plan on `main`. |
-
-*(No code changes in this repo — the bell app is untouched by v3.)*
-
-### API repo (`game-master-bell-api`)
+One repo, one numbered track (as in v1). Every phase is a **single, small,
+reviewable PR** that leaves `main` green and demoable. Production keeps
+running on the v2 Web Push path until the staff migration completes; the
+still-deployed PWA and the archived-later API repo serve as rollback at
+every step.
 
 | # | PR | Scope | Demoable outcome |
 |---|---|---|---|
-| **A6** | FCM sender module | Add `firebase-admin`, an `fcm/` module sending a data-only high-priority topic message, env wiring (`FCM_SERVICE_ACCOUNT_PATH`, `FCM_TOPIC`) + startup check, unit tests with a faked messaging client. Not yet called from `/call`. Runbook: creating the Firebase project + service account. | Tests green; a script/manual call sends a real topic message visible in the Firebase console. |
-| **A7** | Dual fan-out on `/call` | Wire `/call` to send FCM alongside the existing Web Push fan-out, with per-send logging (FR-A8); failure of one channel must not fail the other. | `curl /call` rings both the PWA (Web Push) and a topic-subscribed device. |
-| **A8** | Remove the Web Push path | Delete `web-push`, subscriptions store + endpoints, `GET /vapid-key`, passcode + VAPID env/config and startup checks; update README/RUNBOOK/deploy docs. **Gated on the staff migration being complete.** | Slim FCM-only API; CI green; `/call` still rings every staff phone. |
+| **1** | Adopt PRD v3 | This document; mark PRD-v2 superseded; README pointer. | Agreed plan on `main`. |
+| **2** | Import the call API | Copy `game-master-bell-api` source into `apps/api` as a workspace package (code unchanged); port CI jobs and the SSH deploy workflow with `paths:` filters (`apps/api/**`, `packages/shared/**`); move deploy secrets; verify a monorepo-triggered deploy, then disable the old repo's deploy workflow. | VPS runs a build deployed from the monorepo; old repo kept as rollback. |
+| **3** | Tables via workspace import | Replace the HTTP tables sync with a direct import of `packages/shared`; delete `src/tables/sync.ts`, disk cache, refresh config + their tests; update README/RUNBOOK (table edits now deploy the API). | A `tables.json` edit lands in production via one merged PR; sync code gone. |
+| **4** | FCM sender module | Add `firebase-admin`, an `fcm/` module sending a data-only high-priority topic message, env wiring (`FCM_SERVICE_ACCOUNT_PATH`, `FCM_TOPIC`) + startup check, unit tests with a faked messaging client. Not yet called from `/call`. RUNBOOK: creating the Firebase project + service account. | Tests green; a manual script send shows up in the Firebase console. |
+| **5** | Dual fan-out on `/call` | Wire `/call` to send FCM alongside the existing Web Push fan-out, per-send logging (FR-A8); failure of one channel must not fail the other. | `curl /call` rings both the PWA (Web Push) and a topic-subscribed device. |
+| **6** | Resurrect the Android app | Restore `apps/receiver-android` from `077b508^` (its original path), new Firebase project's `google-services.json`, Android CI job (`assembleDebug` + lint). Near-verbatim restore of reviewed v1 code — review focuses on the delta. | App installs on a staff phone; status screen shows; CI green. |
+| **7** | Custom bell sound + data-only handling | Bundle the licensed sound asset; create channel `table_calls_v2` with `setSound(...)`, retire the v1 channel id; handle **data-only** messages (compose title/body in-app); unique notification id per call (FR-N3). | A call rings the phone **with the bell sound** while the app is killed. |
+| **8** | APK release + rollout runbook | Signed-release workflow publishing an APK to GitHub Releases on tag (keystore in CI secrets); install runbook: sideload steps, "install unknown apps", `POST_NOTIFICATIONS`, battery-optimization + OEM autostart checklist. | Tagged release produces an installable APK; a phone set up purely from the runbook receives calls. |
+| — | **Staff migration (ops, not a PR)** | One phone at a time: install the APK, verify a real bell call rings with the custom sound, unsubscribe that phone's PWA. Both delivery paths stay live throughout. | Every staff phone on the native app. |
+| **9** | Remove the Web Push path | Delete `web-push`, subscriptions store + endpoints, `GET /vapid-key`, passcode + VAPID env/config and startup checks; update docs. **Gated on the staff migration.** | Slim, stateless FCM-only API; `/call` still rings every staff phone. |
+| **10** | Decommission old repos | Take down the PWA Pages site; archive `game-master-bell-receiver` and `game-master-bell-api` (read-only, history preserved); final README/RUNBOOK pass. **Gated on the staff migration.** | One active repo; nothing stale deployed. |
 
-### Receiver repo (`game-master-bell-receiver`)
-
-| # | PR | Scope | Demoable outcome |
-|---|---|---|---|
-| **N1** | Resurrect the v1 Android app | Copy `apps/receiver-android` from the bell repo's history (`077b508^`) into `android/`, new Firebase project's `google-services.json`, Android CI job (`assembleDebug` + lint). Reviewed-before code — review focuses on the diff vs. v1 (paths, project id). PWA untouched. | App installs on a staff phone; status screen shows; CI green. |
-| **N2** | Custom bell sound + data-only handling | Bundle the licensed sound asset; create channel `table_calls_v2` with `setSound(...)` and retire the v1 channel id; handle **data-only** messages (compose title/body in-app); unique notification id per call (FR-N3). | Test message from the Firebase console (or `curl /call` once A7 lands) rings the phone **with the bell sound** while the app is killed. |
-| **N3** | Release & rollout ops | Signed-release APK workflow publishing to GitHub Releases on tag; install runbook: sideload steps, `POST_NOTIFICATIONS`, battery-optimization exemption + OEM autostart checklist per staff device. | Tagged release produces an installable APK; a phone set up purely from the runbook receives calls. |
-| **N4** | Decommission the PWA | Delete PWA source, Pages deploy workflow, and PWA docs; promote the repo README to the Android app. **Gated on the staff migration being complete.** | Receiver repo is Android-only; CI green. |
-
-### Cross-repo ordering
+### Ordering & parallelism
 
 ```mermaid
 flowchart LR
-    B1 --> A6 --> A7 --> M[Staff migration<br/>each phone: install APK,<br/>verify bell sound,<br/>unsubscribe PWA]
-    B1 --> N1 --> N2 --> N3 --> M
-    M --> A8
-    M --> N4
+    P1[1 PRD] --> P2[2 API import] --> P3[3 tables import] --> P4[4 FCM module] --> P5[5 dual fan-out]
+    P1 --> P6[6 Android resurrect] --> P7[7 custom sound] --> P8[8 APK release]
+    P5 --> M[Staff migration]
+    P8 --> M
+    M --> P9[9 remove Web Push]
+    M --> P10[10 archive old repos]
 ```
 
-- **A6/N1 start after B1** (plan agreed); the A and N tracks then run in
-  parallel.
-- **N2's end-to-end demo needs A7**, but its work is independently testable
-  with Firebase console test messages, so the tracks don't block each other.
-- **Staff migration** is an ops step, not a PR: one phone at a time —
-  install the APK from N3's release, verify a real bell call rings with the
-  custom sound, then unsubscribe that phone's PWA. Both delivery paths stay
-  live throughout.
-- **A8 and N4 are gated on the migration finishing** — they delete the
-  safety net, so they go last (in either order).
+- The **API track (2→5)** and the **Android track (6→8)** are independent
+  and can proceed in parallel after phase 1.
+- Phase 7's end-to-end demo needs phase 5, but its work is independently
+  testable with Firebase console test messages, so the tracks don't block
+  each other.
+- Phases 9 and 10 delete the safety net, so they go last (either order),
+  only after every phone is verified on the native app.
 
-**Rollback:** until A8/N4 merge, every phone can fall back to the PWA
+**Rollback:** until phase 9/10, every phone can fall back to the PWA
 (resubscribe from its still-deployed URL) and the API still fans out Web
-Push — reverting is "reinstall nothing, just resubscribe". After A8/N4,
-rollback means reverting those two PRs and redeploying, which restores the
-dual path.
+Push. The API move (phase 2) keeps the old repo deployable until the
+monorepo deploy is verified. After 9/10, rollback means reverting those PRs
+and redeploying — which restores the dual path.
 
 ---
 
 ## 8. Open Questions
 
 1. **The bell sound itself** — a recording of the cafe's physical bell (best
-   brand fit) vs. a licensed CC0 bell sample? Needed by N2; NFR-6 sets the
-   constraints. Assumed: CC0 sample now, replaceable later via a channel-id
-   bump.
+   brand fit) vs. a licensed CC0 bell sample? Needed by phase 7; NFR-6 sets
+   the constraints. Assumed: CC0 sample now, replaceable later via a
+   channel-id bump.
 2. **Sound audibility** — is `USAGE_NOTIFICATION_EVENT` at system
    notification volume loud enough on the cafe floor, or should the channel
    use alarm-stream audio attributes (rings at alarm volume, ignores
-   notification volume)? Decide during N2 testing on a real floor.
-3. **APK signing key custody** — a repo secret for the CI signing workflow
-   (assumed) vs. manual local signing? Affects N3 only.
-4. **Firebase project ownership** — which Google account owns the new
+   notification volume)? Decide during phase 7 testing on a real floor.
+3. **Firebase project ownership** — which Google account owns the new
    Spark project? Should be a shared cafe account, not a personal one
-   (lesson from decommissioning v1). Needed before A6.
+   (lesson from decommissioning v1). Needed before phase 4.
+4. **Release keystore custody** — who holds the offline backup of the APK
+   signing keystore besides the CI secret? Losing it forces
+   uninstall/reinstall on every phone (§3.3). Needed by phase 8.
 5. Carried since v1: acknowledge action and on/off-duty state stay deferred.
    Note: on/off duty would fit naturally as FCM topic unsubscribe/subscribe
    — no server state needed even then.
