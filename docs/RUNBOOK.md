@@ -24,37 +24,41 @@ deploy/ops instructions.
 
 ## Deploying the Bell web app (`apps/bell-web`)
 
-**Current state: manual deploy.** A GitHub Actions workflow that auto-deploys
-`apps/bell-web` to GitHub Pages on merge to `main` is planned (PRD phase 3)
-but hasn't been added to this repo yet — `.github/workflows/` is empty. Until
-that lands, publish a build by hand:
+**Current state: automated deploy via GitHub Actions.**
+`.github/workflows/deploy-bell-web.yml` builds and publishes `apps/bell-web`
+to GitHub Pages on every push to `main` that touches `apps/bell-web/`,
+`packages/shared/`, `pnpm-lock.yaml`, or the workflow file itself (also
+runnable manually via `workflow_dispatch`).
 
-1. Set `VITE_CALL_API_URL` to the deployed call API's `/call` endpoint (e.g.
-   `https://bell-api.gatherloop.id/call`) for the production build (copy
-   `apps/bell-web/.env.example` to `apps/bell-web/.env.local` and fill it in,
-   or export it in the shell).
-2. Build and generate the per-table static pages:
-   ```sh
-   pnpm --filter @game-master-bell/bell-web build
-   ```
-   This runs `vite build` followed by
-   `scripts/generate-table-pages.mjs`, producing `apps/bell-web/dist/`
-   with one `t/<code>/index.html` per active table plus `404.html`
-   (see PRD §"GitHub Pages routing note").
-3. Publish `apps/bell-web/dist/` to the `gh-pages` branch (or whatever branch
-   the repo's GitHub Pages source is configured to serve), e.g. with
-   [`gh-pages`](https://www.npmjs.com/package/gh-pages) or by pushing the
-   built output directly to that branch. Confirm in the repo's **Settings →
-   Pages** that the source matches.
-4. Verify the deploy by opening `https://gatherloop.github.io/game-master-bell/t/<code>/`
-   for a known-active table code, and confirm an unknown code shows the
-   styled 404 page.
+One-time setup (repo admin):
 
-**Follow-up:** replacing this manual step with the GitHub Actions workflow
-from PRD phase 3 is the natural next piece of work — track it as its own PR
-rather than folding it into an unrelated change. When that workflow exists,
-`VITE_CALL_API_URL` should be set as a repository/environment variable the
-workflow passes into the build, per PRD v2 phase B2.
+1. **Settings → Pages → Source**: set to **GitHub Actions**.
+2. **Settings → Secrets and variables → Actions → New repository secret**:
+   add `VITE_CALL_API_URL` set to the deployed call API's `/call` endpoint
+   (e.g. `https://bell-api.gatherloop.id/call`). The workflow injects it as
+   a build-time env var (`vite build` bakes `VITE_*` vars into the static
+   bundle, so it must be supplied at build time, not runtime).
+
+What the workflow does on each run:
+
+1. Installs deps with pnpm (Node version pinned via `.nvmrc`).
+2. Runs `pnpm --filter @game-master-bell/bell-web build` (builds
+   `packages/shared` first via the `prebuild` script, then `vite build`,
+   then `scripts/generate-table-pages.mjs`), producing `apps/bell-web/dist/`
+   with one `t/<code>/index.html` per active table plus `404.html` (see PRD
+   §"GitHub Pages routing note").
+3. Uploads `apps/bell-web/dist/` as a Pages artifact and deploys it with
+   `actions/deploy-pages`.
+
+To deploy by hand instead (e.g. for a one-off out-of-band build), set
+`VITE_CALL_API_URL` locally (copy `apps/bell-web/.env.example` to
+`.env.local` and fill it in, or export it in the shell), run
+`pnpm --filter @game-master-bell/bell-web build`, and publish the resulting
+`apps/bell-web/dist/` however the repo's configured Pages source expects.
+
+Verify a deploy by opening
+`https://gatherloop.github.io/game-master-bell/t/<code>/` for a known-active
+table code, and confirm an unknown code shows the styled 404 page.
 
 ---
 
