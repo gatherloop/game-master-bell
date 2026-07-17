@@ -1,8 +1,8 @@
 # PRD v2 — Game Master Bell: Self-Hosted Refactor
 
 **Product:** Game Master Bell for Gatherloop Board Game Cafe
-**Status:** Draft v2.0 (supersedes `PRD.md` v1.3 for architecture; product behavior is unchanged)
-**Last updated:** 2026-07-16
+**Status:** v2.0 — **superseded by `PRD-v3.md` for the receiver and push delivery** (native Android app + FCM replace the PWA + Web Push; the self-hosted API and bell web app described here are kept). Supersedes `PRD.md` v1.3 for architecture; product behavior is unchanged.
+**Last updated:** 2026-07-17
 
 ---
 
