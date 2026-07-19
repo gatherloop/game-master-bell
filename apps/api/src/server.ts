@@ -30,11 +30,10 @@ async function main() {
   const fcmServiceAccountPath = requireEnv("FCM_SERVICE_ACCOUNT_PATH");
   const fcmTopic = process.env.FCM_TOPIC ?? "game-masters";
   // FR-A9: refuse to start with missing/malformed FCM credentials, same
-  // stance as the VAPID vars above. Constructing (without using) the sender
-  // exercises firebase-admin's own credential parsing, so a malformed
-  // private key fails at startup too, not just missing JSON fields. Not yet
-  // wired into /call (PRD-v3 phase 5).
-  void new FirebaseCloudMessagingSender({
+  // stance as the VAPID vars above. Constructing the sender exercises
+  // firebase-admin's own credential parsing, so a malformed private key
+  // fails at startup too, not just missing JSON fields.
+  const fcmSender = new FirebaseCloudMessagingSender({
     topic: fcmTopic,
     serviceAccountPath: fcmServiceAccountPath,
     logger: bootstrapLogger,
@@ -53,6 +52,7 @@ async function main() {
     staffPasscode,
     vapidPublicKey,
     pushSender,
+    fcmSender,
     corsOrigins,
   });
 

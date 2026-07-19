@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
 import { findTableByCode, type Table } from "@game-master-bell/shared";
 import { CallRequestSchema } from "./call/schema.js";
+import type { FcmSender } from "./fcm/service.js";
 import type { PushSender } from "./push/service.js";
 import { isValidPasscode } from "./subscriptions/auth.js";
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from "./subscriptions/schema.js";
@@ -17,6 +18,7 @@ export interface BuildAppOptions {
   staffPasscode?: string;
   vapidPublicKey?: string;
   pushSender?: PushSender;
+  fcmSender?: FcmSender;
   corsOrigins?: string[];
 }
 
@@ -37,12 +39,17 @@ const noopPushSender: PushSender = {
   sendToAll: async () => {},
 };
 
+const noopFcmSender: FcmSender = {
+  sendCall: async () => {},
+};
+
 export function buildApp({
   tablesStore = defaultTablesStore,
   subscriptionStore = emptySubscriptionStore,
   staffPasscode,
   vapidPublicKey,
   pushSender = noopPushSender,
+  fcmSender = noopFcmSender,
   corsOrigins = defaultCorsOrigins,
 }: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: true });
@@ -109,7 +116,11 @@ export function buildApp({
     }
 
     app.log.info({ tableCode: table.code }, "call.received");
-    await pushSender.sendToAll(table);
+    // FR-A2v3: fan out over both channels; each sender already logs its own
+    // outcome (FR-A8). Promise.allSettled ensures one channel's rejection
+    // can never fail the other, even though both senders are designed to
+    // catch and log internally rather than throw.
+    await Promise.allSettled([pushSender.sendToAll(table), fcmSender.sendCall(table)]);
     return reply.status(200).send({ ok: true });
   });
 
