@@ -1,11 +1,15 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance } from "fastify";
+import { findTableByCode, type Table } from "@game-master-bell/shared";
 import { CallRequestSchema } from "./call/schema.js";
 import type { PushSender } from "./push/service.js";
 import { isValidPasscode } from "./subscriptions/auth.js";
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from "./subscriptions/schema.js";
 import type { SubscriptionStore } from "./subscriptions/store.js";
-import type { TablesLookup } from "./tables/service.js";
+
+export interface TablesLookup {
+  findByCode(code: string): Table | undefined;
+}
 
 export interface BuildAppOptions {
   tablesStore?: TablesLookup;
@@ -18,8 +22,9 @@ export interface BuildAppOptions {
 
 const defaultCorsOrigins = ["https://gatherloop.github.io"];
 
-const emptyTablesStore: TablesLookup = {
-  findByCode: () => undefined,
+/** Table data is compiled in from `@game-master-bell/shared` (PRD-v3 phase 3) — no sync, no cache. */
+const defaultTablesStore: TablesLookup = {
+  findByCode: findTableByCode,
 };
 
 const emptySubscriptionStore: SubscriptionStore = {
@@ -33,7 +38,7 @@ const noopPushSender: PushSender = {
 };
 
 export function buildApp({
-  tablesStore = emptyTablesStore,
+  tablesStore = defaultTablesStore,
   subscriptionStore = emptySubscriptionStore,
   staffPasscode,
   vapidPublicKey,

@@ -5,15 +5,19 @@
   "description": "Self-hosted call API for Game Master Bell (validates bell calls, fans out Web Push notifications)",
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter @game-master-bell/shared build",
     "dev": "tsx watch src/server.ts",
+    "prebuild": "pnpm --filter @game-master-bell/shared build",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -b",
+    "pretest": "pnpm --filter @game-master-bell/shared build",
     "test": "vitest run",
     "vapid:generate": "tsx scripts/generate-vapid-keys.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@game-master-bell/shared": "workspace:*",
     "better-sqlite3": "^12.11.1",
     "fastify": "^5.6.1",
     "pino": "^10.3.1",

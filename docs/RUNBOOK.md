@@ -70,6 +70,17 @@ table code, and confirm an unknown code shows the styled 404 page.
 
 ---
 
+## Editing table data (`packages/shared/src/tables.json`)
+
+As of PRD-v3 phase 3, both `apps/bell-web` and `apps/api` import
+`tables.json` directly from `packages/shared` at build time — there is no
+runtime sync or cache on the API side anymore. A merged edit to
+`packages/shared/src/tables.json` triggers **both** deploy workflows
+(`deploy-bell-web.yml` and `deploy-api.yml` each filter on
+`packages/shared/**`), so a table add/rename/(de)activate reaches
+production in one PR, atomically, once both workflows finish — no waiting
+on an hourly refresh.
+
 ## Generating and printing table QR codes
 
 Each table's QR code just encodes the URL of its generated page

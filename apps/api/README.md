@@ -6,10 +6,11 @@ app and fans them out as Web Push notifications to game master devices, with
 no Google/Firebase dependency.
 
 Moved here from the standalone `game-master-bell-api` repo (PRD-v3 phase 2)
-as an unchanged workspace package — see [PRD-v3 §3.2](../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)
-for the plan to drop the `tables.json` HTTP sync (phase 3) and add FCM
-sending (phase 4) so `/call` fans out to both Web Push and FCM devices
-during the receiver migration.
+as an unchanged workspace package. As of PRD-v3 phase 3, table codes are
+validated against `tables.json` imported directly from `packages/shared` at
+build time — see [PRD-v3 §3.2](../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)
+for the plan to add FCM sending (phase 4) so `/call` fans out to both Web
+Push and FCM devices during the receiver migration.
 
 ## Stack
 
@@ -52,17 +53,16 @@ shares the monorepo's ESLint/Prettier config.
 
 ## Configuration
 
-See [`.env.example`](.env.example). `TABLES_URL`/`TABLES_CACHE_PATH`/
-`TABLES_REFRESH_INTERVAL_MS` still fetch `tables.json` over HTTP for now
-(PRD-v3 phase 3 replaces this with a direct `packages/shared` import).
-`SUBSCRIPTIONS_DB_PATH`, `CORS_ORIGINS`, `STAFF_PASSCODE`,
-`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` are unchanged from
-the standalone repo.
+See [`.env.example`](.env.example). Table data has no runtime config at
+all — `tables.json` is imported straight from `@game-master-bell/shared`
+at build time (`src/app.ts`), so a table edit reaches production by
+triggering this package's deploy workflow (`paths:` filter on
+`packages/shared/**`), not by restarting the process. `SUBSCRIPTIONS_DB_PATH`,
+`CORS_ORIGINS`, `STAFF_PASSCODE`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/
+`VAPID_SUBJECT` are unchanged from the standalone repo.
 
-The API refuses to start if it has never loaded any copy of the tables data
-(neither a live fetch nor a disk cache), or if `STAFF_PASSCODE`/
-`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` are unset; a failed
-tables refresh after startup just keeps the last good copy.
+The API refuses to start if `STAFF_PASSCODE`/`VAPID_PUBLIC_KEY`/
+`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` are unset.
 
 ## Deploying
 

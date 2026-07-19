@@ -48,6 +48,9 @@ importers:
       '@fastify/cors':
         specifier: ^11.3.0
         version: 11.3.0
+      '@game-master-bell/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
