@@ -9,10 +9,14 @@ Moved here from the standalone `game-master-bell-api` repo (PRD-v3 phase 2)
 as an unchanged workspace package. As of PRD-v3 phase 3, table codes are
 validated against `tables.json` imported directly from `packages/shared` at
 build time. As of PRD-v3 phase 4, an FCM sender module (`src/fcm/`) can send
-a data-only, high-priority topic message via `firebase-admin` — it is not
-yet called from `/call`; see [PRD-v3 §3.2](../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)
-for phase 5, which wires it in so `/call` fans out to both Web Push and FCM
-devices during the receiver migration.
+a data-only, high-priority topic message via `firebase-admin`. As of PRD-v3
+phase 5 (see [PRD-v3 §3.2](../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)),
+`POST /call` fans out to **both** Web Push and FCM on every call — each
+channel sends and logs independently, so one channel failing (e.g. FCM
+misconfigured, or a dead Web Push subscription) never fails or blocks the
+other. This dual fan-out is the bridge state for the receiver migration:
+once every staff phone runs the native Android app, phase 9 removes the Web
+Push path.
 
 ## Stack
 
@@ -50,7 +54,7 @@ shares the monorepo's ESLint/Prettier config.
 | ------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /healthz`          | None           | Liveness check                                                                                                                                                                                                                                                 |
 | `GET /vapid-key`        | None           | Returns `{ publicKey }`, the API's VAPID public key. 500 if not configured.                                                                                                                                                                                    |
-| `POST /call`            | None           | Validate `{ tableCode }` against synced table data, then fan out a Web Push notification to every stored subscription. 400 malformed, 404 unknown/inactive, 200 on a valid call (push sends run concurrently; a dead device doesn't delay or fail the others). |
+| `POST /call`            | None           | Validate `{ tableCode }` against synced table data, then fan out a call notification over Web Push (every stored subscription) and FCM (the `game-masters` topic) concurrently. 400 malformed, 404 unknown/inactive, 200 on a valid call (sends run concurrently across and within both channels; a dead device or a down channel doesn't delay or fail the others). |
 | `POST /subscriptions`   | Staff passcode | Upsert `{ subscription, passcode }` (a `PushSubscription`), keyed by endpoint — idempotent. 400 malformed, 401 bad passcode, 200 stored.                                                                                                                       |
 | `DELETE /subscriptions` | Staff passcode | Remove `{ endpoint, passcode }`. Idempotent (200 even if the endpoint was never stored). 400 malformed, 401 bad passcode.                                                                                                                                      |
 

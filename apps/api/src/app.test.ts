@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Table } from "@game-master-bell/shared";
 import { buildApp, type TablesLookup } from "./app.js";
+import type { FcmSender } from "./fcm/service.js";
 import type { PushSender } from "./push/service.js";
 import type { PushSubscription } from "./subscriptions/schema.js";
 import type { StoredSubscription, SubscriptionStore } from "./subscriptions/store.js";
@@ -130,6 +131,70 @@ describe("POST /call", () => {
     await app.inject({ method: "POST", url: "/call", payload: { tableCode: "9-99" } });
 
     expect(pushSender.sendToAll).not.toHaveBeenCalled();
+  });
+
+  it("fans the call out via the FCM sender for a known, active table", async () => {
+    const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
+    const app = buildApp({ tablesStore: fakeTablesStore(), fcmSender });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/call",
+      payload: { tableCode: "2-05" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fcmSender.sendCall).toHaveBeenCalledWith(activeTable);
+  });
+
+  it("does not fan out to FCM for an unknown table code", async () => {
+    const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
+    const app = buildApp({ tablesStore: fakeTablesStore(), fcmSender });
+
+    await app.inject({ method: "POST", url: "/call", payload: { tableCode: "9-99" } });
+
+    expect(fcmSender.sendCall).not.toHaveBeenCalled();
+  });
+
+  it("fans out to both Web Push and FCM for the same call", async () => {
+    const pushSender: PushSender = { sendToAll: vi.fn().mockResolvedValue(undefined) };
+    const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
+    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender, fcmSender });
+
+    await app.inject({ method: "POST", url: "/call", payload: { tableCode: "2-05" } });
+
+    expect(pushSender.sendToAll).toHaveBeenCalledWith(activeTable);
+    expect(fcmSender.sendCall).toHaveBeenCalledWith(activeTable);
+  });
+
+  it("still succeeds and still calls FCM when the push sender rejects", async () => {
+    const pushSender: PushSender = { sendToAll: vi.fn().mockRejectedValue(new Error("boom")) };
+    const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
+    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender, fcmSender });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/call",
+      payload: { tableCode: "2-05" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fcmSender.sendCall).toHaveBeenCalledWith(activeTable);
+  });
+
+  it("still succeeds and still calls the push sender when the FCM sender rejects", async () => {
+    const pushSender: PushSender = { sendToAll: vi.fn().mockResolvedValue(undefined) };
+    const fcmSender: FcmSender = { sendCall: vi.fn().mockRejectedValue(new Error("boom")) };
+    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender, fcmSender });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/call",
+      payload: { tableCode: "2-05" },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(pushSender.sendToAll).toHaveBeenCalledWith(activeTable);
   });
 
   it("returns 404 for an unknown table code", async () => {
