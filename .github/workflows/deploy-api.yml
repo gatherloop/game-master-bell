@@ -1,0 +1,70 @@
+name: Deploy api to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/shared/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec eslint apps/api
+      - run: pnpm --filter @game-master-bell/api typecheck
+      - run: pnpm --filter @game-master-bell/api test
+      - run: pnpm --filter @game-master-bell/api build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            export XDG_RUNTIME_DIR=/run/user/$(id -u)
+            cd ${{ secrets.VPS_DEPLOY_PATH }}
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm install
+            corepack enable
+            git fetch origin main
+            git reset --hard origin/main
+            cat > apps/api/.env <<'ENV_EOF'
+            STAFF_PASSCODE=${{ secrets.STAFF_PASSCODE }}
+            VAPID_PUBLIC_KEY=${{ secrets.VAPID_PUBLIC_KEY }}
+            VAPID_PRIVATE_KEY=${{ secrets.VAPID_PRIVATE_KEY }}
+            VAPID_SUBJECT=${{ secrets.VAPID_SUBJECT }}
+            ENV_EOF
+            mkdir -p apps/api/data
+            pnpm install --frozen-lockfile
+            pnpm --filter @game-master-bell/api build
+            pnpm prune --prod
+            mkdir -p ~/.config/systemd/user
+            cp apps/api/deploy/game-master-bell-api.service ~/.config/systemd/user/
+            systemctl --user daemon-reload
+            systemctl --user enable game-master-bell-api
+            systemctl --user restart game-master-bell-api

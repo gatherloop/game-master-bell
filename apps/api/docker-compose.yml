@@ -1,0 +1,20 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    restart: always
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      TABLES_CACHE_PATH: /app/apps/api/data/tables-cache.json
+      SUBSCRIPTIONS_DB_PATH: /app/apps/api/data/subscriptions.db
+    volumes:
+      - api-data:/app/apps/api/data
+
+volumes:
+  api-data:
