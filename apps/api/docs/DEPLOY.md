@@ -41,6 +41,13 @@ Fill in `.env` with production values:
   every outgoing Web Push message and must stay secret.
 - `VAPID_SUBJECT` — a `mailto:` address or `https:` URL push services may use
   to contact us about this key pair, per the VAPID spec.
+- `FCM_SERVICE_ACCOUNT_PATH` — path to the Firebase service-account JSON used
+  to send FCM notifications; see [RUNBOOK.md](RUNBOOK.md#creating-the-firebase-project--service-account)
+  for how to obtain it. Place the file at `apps/api/fcm-service-account.json`
+  (matching `docker-compose.yml`'s bind mount) and leave the env var at its
+  `.env.example` default. Required — the API refuses to start without it
+  (FR-A9), same as the VAPID vars above; it is not yet sent from `POST /call`
+  (PRD-v3 phase 5 wires that up).
 
 `SUBSCRIPTIONS_DB_PATH` defaults to `./data/subscriptions.db`;
 `docker-compose.yml` mounts a named volume at `/app/apps/api/data` so the

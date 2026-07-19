@@ -1,5 +1,6 @@
 import pino from "pino";
 import { buildApp } from "./app.js";
+import { FirebaseCloudMessagingSender } from "./fcm/service.js";
 import { WebPushSender } from "./push/service.js";
 import { SqliteSubscriptionStore } from "./subscriptions/store.js";
 
@@ -25,6 +26,19 @@ async function main() {
   const vapidPublicKey = requireEnv("VAPID_PUBLIC_KEY");
   const vapidPrivateKey = requireEnv("VAPID_PRIVATE_KEY");
   const vapidSubject = requireEnv("VAPID_SUBJECT");
+
+  const fcmServiceAccountPath = requireEnv("FCM_SERVICE_ACCOUNT_PATH");
+  const fcmTopic = process.env.FCM_TOPIC ?? "game-masters";
+  // FR-A9: refuse to start with missing/malformed FCM credentials, same
+  // stance as the VAPID vars above. Constructing (without using) the sender
+  // exercises firebase-admin's own credential parsing, so a malformed
+  // private key fails at startup too, not just missing JSON fields. Not yet
+  // wired into /call (PRD-v3 phase 5).
+  void new FirebaseCloudMessagingSender({
+    topic: fcmTopic,
+    serviceAccountPath: fcmServiceAccountPath,
+    logger: bootstrapLogger,
+  });
 
   const subscriptionStore = new SqliteSubscriptionStore(subscriptionsDbPath);
 

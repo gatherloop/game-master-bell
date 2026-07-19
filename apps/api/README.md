@@ -8,9 +8,11 @@ no Google/Firebase dependency.
 Moved here from the standalone `game-master-bell-api` repo (PRD-v3 phase 2)
 as an unchanged workspace package. As of PRD-v3 phase 3, table codes are
 validated against `tables.json` imported directly from `packages/shared` at
-build time — see [PRD-v3 §3.2](../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)
-for the plan to add FCM sending (phase 4) so `/call` fans out to both Web
-Push and FCM devices during the receiver migration.
+build time. As of PRD-v3 phase 4, an FCM sender module (`src/fcm/`) can send
+a data-only, high-priority topic message via `firebase-admin` — it is not
+yet called from `/call`; see [PRD-v3 §3.2](../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)
+for phase 5, which wires it in so `/call` fans out to both Web Push and FCM
+devices during the receiver migration.
 
 ## Stack
 
@@ -40,6 +42,7 @@ shares the monorepo's ESLint/Prettier config.
 | `typecheck`            | `tsc -b`                                   |
 | `test`                 | Vitest                                     |
 | `vapid:generate`       | Print a new VAPID key pair                 |
+| `fcm:send-test`        | Send one test FCM call message to `FCM_TOPIC` (manual smoke test, not part of `/call`) |
 
 ## Endpoints
 
@@ -61,8 +64,15 @@ triggering this package's deploy workflow (`paths:` filter on
 `CORS_ORIGINS`, `STAFF_PASSCODE`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/
 `VAPID_SUBJECT` are unchanged from the standalone repo.
 
+`FCM_SERVICE_ACCOUNT_PATH` (path to a Firebase service-account JSON) and
+`FCM_TOPIC` (defaults to `game-masters`) configure the FCM sender module
+added in PRD-v3 phase 4 (`src/fcm/`) — see
+[docs/RUNBOOK.md](docs/RUNBOOK.md#creating-the-firebase-project--service-account)
+for how to create the Firebase project and service account.
+
 The API refuses to start if `STAFF_PASSCODE`/`VAPID_PUBLIC_KEY`/
-`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` are unset.
+`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`/`FCM_SERVICE_ACCOUNT_PATH` are unset, or
+if the FCM service-account file is missing/malformed (FR-A9).
 
 ## Deploying
 
