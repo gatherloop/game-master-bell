@@ -1,10 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildApp } from "./app.js";
+import type { Table } from "@game-master-bell/shared";
+import { buildApp, type TablesLookup } from "./app.js";
 import type { PushSender } from "./push/service.js";
 import type { PushSubscription } from "./subscriptions/schema.js";
 import type { StoredSubscription, SubscriptionStore } from "./subscriptions/store.js";
-import type { TablesLookup } from "./tables/service.js";
-import type { Table } from "./tables/schema.js";
 
 const activeTable: Table = {
   code: "2-05",

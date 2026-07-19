@@ -42,10 +42,11 @@ Fill in `.env` with production values:
 - `VAPID_SUBJECT` — a `mailto:` address or `https:` URL push services may use
   to contact us about this key pair, per the VAPID spec.
 
-`TABLES_CACHE_PATH` and `SUBSCRIPTIONS_DB_PATH` default to `./data/tables-cache.json`
-and `./data/subscriptions.db`; `docker-compose.yml` mounts a named volume at
-`/app/apps/api/data` so the on-disk tables cache and the subscriptions
-database survive container restarts and redeploys.
+`SUBSCRIPTIONS_DB_PATH` defaults to `./data/subscriptions.db`;
+`docker-compose.yml` mounts a named volume at `/app/apps/api/data` so the
+subscriptions database survives container restarts and redeploys. Table
+data has no on-disk state — it's compiled in from `packages/shared` at
+build time.
 
 ## 2. Run the API container
 

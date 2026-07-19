@@ -1,6 +1,6 @@
 import webpush from "web-push";
+import type { Table } from "@game-master-bell/shared";
 import type { StoredSubscription, SubscriptionStore } from "../subscriptions/store.js";
-import type { Table } from "../tables/schema.js";
 
 export interface PushLogger {
   info(data: Record<string, unknown>, message: string): void;

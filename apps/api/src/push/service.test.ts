@@ -1,8 +1,8 @@
 import webpush from "web-push";
 import { describe, expect, it, vi } from "vitest";
+import type { Table } from "@game-master-bell/shared";
 import { buildPushPayload, WebPushSender, type PushLogger } from "./service.js";
 import type { StoredSubscription, SubscriptionStore } from "../subscriptions/store.js";
-import type { Table } from "../tables/schema.js";
 
 const table: Table = {
   code: "2-05",

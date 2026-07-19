@@ -42,8 +42,9 @@ mkdir -p data
 Fill in `.env` with the same production values described in
 [DEPLOY.md step 1](DEPLOY.md#1-get-the-code-onto-the-vps):
 `STAFF_PASSCODE`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
-`TABLES_CACHE_PATH`/`SUBSCRIPTIONS_DB_PATH` default to `./data/...`,
-relative to this directory — the `mkdir -p data` above creates it.
+`SUBSCRIPTIONS_DB_PATH` defaults to `./data/...`, relative to this
+directory — the `mkdir -p data` above creates it. Table data has no env var
+or on-disk state — it's compiled in from `packages/shared` at build time.
 
 ## 2. Build
 
@@ -163,10 +164,9 @@ then update `VPS_DEPLOY_PATH` to the monorepo checkout path:
 | `VAPID_SUBJECT`     | Same value described in step 1                                                   |
 
 Only these four env vars need to be secrets; everything else keeps the
-default already baked into `.env.example`. To override another default
-too (e.g. a non-default `TABLES_URL`), add it as another secret and an
-extra line in the `cat > apps/api/.env` heredoc in
-`.github/workflows/deploy-api.yml`.
+default already baked into `.env.example`. To override another default,
+add it as another secret and an extra line in the `cat > apps/api/.env`
+heredoc in `.github/workflows/deploy-api.yml`.
 
 Once the secrets are set, push to `main` (or run the workflow manually
 from the **Actions** tab) to trigger a deploy.

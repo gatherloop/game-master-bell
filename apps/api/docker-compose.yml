@@ -11,7 +11,6 @@ services:
     environment:
       PORT: 3000
       HOST: 0.0.0.0
-      TABLES_CACHE_PATH: /app/apps/api/data/tables-cache.json
       SUBSCRIPTIONS_DB_PATH: /app/apps/api/data/subscriptions.db
     volumes:
       - api-data:/app/apps/api/data
