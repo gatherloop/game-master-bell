@@ -16,9 +16,17 @@ verified on the VPS, per PRD-v3's migration plan.
 
 The receiver PWA still lives in `gatherloop/game-master-bell-receiver` and
 keeps receiving Web Push from its own repo/deploy until every staff phone
-runs the native Android receiver (a later PRD-v3 phase, landing at
-`apps/receiver-android` in this repo); see that repo's runbook for its
-deploy/ops instructions until then.
+runs the native Android receiver; see that repo's runbook for its deploy/ops
+instructions until the staff migration (PRD-v3 §7) completes.
+
+As of PRD-v3 phase 6, the native Android receiver lives at
+`apps/receiver-android` in this repo (see
+[apps/receiver-android/README.md](../apps/receiver-android/README.md)),
+restored from this repo's own v1 history. It is not yet distributed to
+staff phones — the custom bell sound (phase 7) and signed APK release
+(phase 8) land in later phases; until then it's built and linted in CI
+(`.github/workflows/android-ci.yml`, `./gradlew lint assembleDebug`) but not
+installed anywhere.
 
 ---
 
@@ -111,11 +119,38 @@ reprinting its QR sticker — only re-running `generate-qr` when a table's
 
 ---
 
+## Building the Android receiver app (`apps/receiver-android`)
+
+A standard Gradle project (not a pnpm workspace package — it has no
+`package.json`), living alongside the workspace as in v1. Requires JDK 17
+and Android SDK/build tools (Android Studio installs both).
+
+```sh
+cd apps/receiver-android
+./gradlew assembleDebug   # builds app/build/outputs/apk/debug/app-debug.apk
+./gradlew lint            # Android lint, same check CI runs
+```
+
+`.github/workflows/android-ci.yml` runs both on every push/PR touching
+`apps/receiver-android/**`. The committed `app/google-services.json` is a
+placeholder (see [apps/receiver-android/README.md](../apps/receiver-android/README.md#firebase-setup))
+— enough to build, but a device using it won't receive real pushes until
+it's swapped for the real project's file.
+
+As of phase 6 this is a near-verbatim restore of the reviewed v1 app: no
+custom bell sound yet (still the system default sound on the v1
+`panggilan_meja` channel — phase 7 bundles the sound and bumps the channel
+id) and no signed release build (phase 8). Installing the debug APK on a
+staff phone and subscribing to the `game-masters` topic is enough to see
+the status screen and receive a plain-sound test notification.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
 | Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (`apps/api`, see [apps/api/docs/DEPLOY_NATIVE.md](../apps/api/docs/DEPLOY_NATIVE.md) for `journalctl` commands). |
 | Table page 404s for a real table | `tables.json` entry missing/inactive, or the web app wasn't rebuilt after a `tables.json` change (static pages are generated at build time, not runtime). |
-| No push received on a game master phone | See the receiver PWA's runbook (`gatherloop/game-master-bell-receiver`) for subscription state, passcode, and VAPID key troubleshooting. |
+| No push received on a game master phone | Check the Android app's status screen for notification-permission/topic-subscription state (`apps/receiver-android`); for phones still on the old PWA, see its runbook (`gatherloop/game-master-bell-receiver`) for subscription state, passcode, and VAPID key troubleshooting. |
 | QR sticker leads to the 404 page | Table code was deactivated or renamed in `tables.json` without reprinting — regenerate with `pnpm generate-qr` and reprint that table's sticker. |
