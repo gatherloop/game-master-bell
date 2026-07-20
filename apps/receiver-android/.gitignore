@@ -9,3 +9,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Release signing — written locally or by CI from secrets, never committed (see docs/RUNBOOK.md §1).
+keystore.properties
+*.jks
+*.keystore
