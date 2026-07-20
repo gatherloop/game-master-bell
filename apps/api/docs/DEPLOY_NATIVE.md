@@ -36,19 +36,17 @@ from the `apps/api` subdirectory:
 git clone https://github.com/gatherloop/game-master-bell.git
 cd game-master-bell/apps/api
 cp .env.example .env
-mkdir -p data
 ```
 
-Fill in `.env` with the same production values described in
+Fill in `.env` with the same production value described in
 [DEPLOY.md step 1](DEPLOY.md#1-get-the-code-onto-the-vps):
-`STAFF_PASSCODE`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`,
 `FCM_SERVICE_ACCOUNT_PATH` (place the JSON file alongside `.env` at
 `apps/api/fcm-service-account.json` and leave the env var at its
 `.env.example` default — see
 [RUNBOOK.md](RUNBOOK.md#creating-the-firebase-project--service-account)).
-`SUBSCRIPTIONS_DB_PATH` defaults to `./data/...`, relative to this
-directory — the `mkdir -p data` above creates it. Table data has no env var
-or on-disk state — it's compiled in from `packages/shared` at build time.
+Table data has no env var or on-disk state — it's compiled in from
+`packages/shared` at build time; as of PRD-v3 phase 9 the API keeps no
+persistent state at all.
 
 ## 2. Build
 
@@ -99,8 +97,7 @@ Identical to the Docker guide — see DEPLOY.md's
 ["Reverse proxy with TLS"](DEPLOY.md#3-reverse-proxy-with-tls) and
 ["Verify end to end"](DEPLOY.md#4-verify-end-to-end) sections. Swap
 `docker compose logs -f` for `journalctl --user -u game-master-bell-api -f`
-when checking for the per-subscription `push.send_result`/`push.pruned`
-log lines.
+when checking for the `fcm.send_result` log line.
 
 ## Redeploying manually
 
@@ -162,18 +159,15 @@ then update `VPS_DEPLOY_PATH` to the monorepo checkout path:
 | `VPS_USERNAME`      | The deploy user created above                                                    |
 | `VPS_SSH_KEY`       | The **private** key from step 3 (paste the whole file contents)                  |
 | `VPS_DEPLOY_PATH`   | Absolute path to the **monorepo** clone on the VPS, e.g. `/home/deploy/game-master-bell` (not the `apps/api` subdirectory — the deploy script `cd`s there and runs workspace-relative commands) |
-| `STAFF_PASSCODE`         | Same value described in step 1                                              |
-| `VAPID_PUBLIC_KEY`       | Same value described in step 1                                              |
-| `VAPID_PRIVATE_KEY`      | Same value described in step 1                                              |
-| `VAPID_SUBJECT`          | Same value described in step 1                                              |
 | `FCM_SERVICE_ACCOUNT_JSON` | The full contents of the Firebase service-account JSON file (paste the whole file, not a path) — see [RUNBOOK.md](RUNBOOK.md#creating-the-firebase-project--service-account) |
 
 The workflow writes `FCM_SERVICE_ACCOUNT_JSON` to
 `apps/api/fcm-service-account.json` on the VPS on every deploy and points
-`FCM_SERVICE_ACCOUNT_PATH` at it. These five env vars need to be secrets;
-everything else keeps the default already baked into `.env.example`. To
-override another default, add it as another secret and an extra line in the
-`cat > apps/api/.env` heredoc in `.github/workflows/deploy-api.yml`.
+`FCM_SERVICE_ACCOUNT_PATH` at it. This is the only env var that needs to be
+a secret; everything else keeps the default already baked into
+`.env.example`. To override another default, add it as another secret and
+an extra line in the `cat > apps/api/.env` heredoc in
+`.github/workflows/deploy-api.yml`.
 
 Once the secrets are set, push to `main` (or run the workflow manually
 from the **Actions** tab) to trigger a deploy.
@@ -181,12 +175,12 @@ from the **Actions** tab) to trigger a deploy.
 ## Next steps
 
 Once the monorepo-triggered deploy is verified end to end (`GET /healthz`
-on the VPS still responds, and a real `POST /call` still fans out a push),
-disable the old `game-master-bell-api` repo's `.github/workflows/deploy.yml`
-(e.g. delete the file or its secrets) so the VPS has exactly one deploy
-source, per [PRD-v3 phase 2](../../../docs/PRD-v3.md#7-implementation-phases).
-Until then, the old repo's workflow is kept as a rollback path. See
-[RUNBOOK.md](RUNBOOK.md) for the phase A5-era operational reference: the
-Firebase project decommission checklist (already done, kept for history),
-wiring up uptime monitoring for `GET /healthz`, and the staff passcode
-rotation procedure.
+on the VPS still responds, and a real `POST /call` still rings a topic-
+subscribed device), disable the old `game-master-bell-api` repo's
+`.github/workflows/deploy.yml` (e.g. delete the file or its secrets) so the
+VPS has exactly one deploy source, per
+[PRD-v3 phase 2](../../../docs/PRD-v3.md#7-implementation-phases). Until
+then, the old repo's workflow is kept as a rollback path. See
+[RUNBOOK.md](RUNBOOK.md) for creating the Firebase project + service
+account, the (historical) v1 Firebase project decommission checklist, and
+wiring up uptime monitoring for `GET /healthz`.

@@ -3,7 +3,6 @@ dist/
 build/
 coverage/
 /qr-codes/
-/apps/api/data/
 *.tsbuildinfo
 .DS_Store
 *.log

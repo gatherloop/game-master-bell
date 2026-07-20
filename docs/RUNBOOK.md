@@ -163,5 +163,5 @@ it.
 |---|---|
 | Bell tap shows "Panggilan gagal, coba lagi" | `VITE_CALL_API_URL` misconfigured/unreachable, or CORS origin mismatch (FR-A4) — check the browser console and the call API's logs (`apps/api`, see [apps/api/docs/DEPLOY_NATIVE.md](../apps/api/docs/DEPLOY_NATIVE.md) for `journalctl` commands). |
 | Table page 404s for a real table | `tables.json` entry missing/inactive, or the web app wasn't rebuilt after a `tables.json` change (static pages are generated at build time, not runtime). |
-| No push received on a game master phone | Check the Android app's status screen for notification-permission/topic-subscription state (`apps/receiver-android`); for phones still on the old PWA, see its runbook (`gatherloop/game-master-bell-receiver`) for subscription state, passcode, and VAPID key troubleshooting. |
+| No push received on a game master phone | Check the Android app's status screen for notification-permission/topic-subscription state (`apps/receiver-android`), and the API logs for the `fcm.send_result` outcome of the call (`apps/api`). As of PRD-v3 phase 9 the API sends FCM only — Web Push and the receiver PWA are retired. |
 | QR sticker leads to the 404 page | Table code was deactivated or renamed in `tables.json` without reprinting — regenerate with `pnpm generate-qr` and reprint that table's sticker. |

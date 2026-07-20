@@ -1,14 +1,21 @@
 # Runbook — Firebase Setup, Decommission & Operations
 
-Sections 2–4 below are carried over from the API's standalone-repo history
+Sections 2–3 below are carried over from the API's standalone-repo history
 (PRD-v2 phase A5, the final step of that repo's API track) — the content
-(the *old* v1 Firebase decommission, `/healthz` monitoring, passcode
-rotation) is unchanged by the [PRD-v3](../../../docs/PRD-v3.md) move into
-this monorepo; only the file's location and cross-links moved. By that
-point the v1 Firebase Cloud Function and native Android receiver had
-already been removed from the bell app, and the production call path had
-been running on this API since PRD-v2 phase B2. Nothing referenced the v1
-Firebase project, so it was safe to tear down (§2).
+(the *old* v1 Firebase decommission, `/healthz` monitoring) is unchanged by
+the [PRD-v3](../../../docs/PRD-v3.md) move into this monorepo; only the
+file's location and cross-links moved. By that point the v1 Firebase Cloud
+Function and native Android receiver had already been removed from the
+bell app, and the production call path had been running on this API since
+PRD-v2 phase B2. Nothing referenced the v1 Firebase project, so it was safe
+to tear down (§2).
+
+PRD-v2's staff-passcode rotation section (formerly §4 here) was deleted in
+PRD-v3 phase 9 along with `STAFF_PASSCODE` itself: once every staff phone
+ran the native Android app, the Web Push path — the only thing the
+passcode gated — was removed. FCM topic fan-out needs no receiver
+registration, so there's nothing left to rotate (see
+[PRD-v3 §3.2 "Who can receive calls?"](../../../docs/PRD-v3.md#32-call-api-appsapi-moved-into-this-repo)).
 
 Section 1 is new for PRD-v3 phase 4: v3 brings Firebase back, in a
 narrower role — FCM only, no Cloud Functions, no billing account (see
@@ -50,8 +57,7 @@ and is not reused.
    (gear icon) → **Service accounts** tab → **Generate new private key** →
    confirm → a JSON file downloads. This is the credential
    `src/fcm/credentials.ts` loads (`project_id`, `client_email`,
-   `private_key` fields) — treat it like any other private key (it's the
-   FCM-equivalent of the VAPID private key it sits alongside in `.env`).
+   `private_key` fields) — treat it like any other private key.
 5. **Place the file.**
    - **Local dev:** save it as `apps/api/fcm-service-account.json` (already
      covered by `.gitignore`'s `*fcm-service-account*.json` pattern — never
@@ -187,46 +193,3 @@ alert fires within one check interval, then start it back up
 (`docker compose start`) and confirm the alert clears. This is the
 demoable outcome for phase A5's monitoring side: **monitoring live** — not
 just configured, but proven to notify on a real failure.
-
----
-
-## 4. Staff passcode rotation
-
-`STAFF_PASSCODE` gates `POST`/`DELETE /subscriptions` only (per FR-A5) — it
-is **not** checked when sending calls or pushes, so rotating it never
-disrupts devices that are already subscribed. Existing rows in the
-subscriptions database keep receiving pushes through a rotation with zero
-downtime. The passcode only matters the next time a device needs to
-subscribe or unsubscribe (a new staff phone, a reinstalled receiver PWA, or
-an explicit unsubscribe).
-
-Rotate it periodically (e.g. when staff turnover happens, or on a routine
-schedule the team sets) as follows:
-
-1. Generate a new passcode:
-   ```bash
-   openssl rand -hex 16
-   ```
-2. Update `STAFF_PASSCODE` in the VPS's `.env` file to the new value.
-3. Restart the API container to pick it up:
-   ```bash
-   docker compose up -d
-   ```
-   (Compose only recreates the container if the config changed; `--force-recreate`
-   guarantees it if you want to be explicit.)
-4. Confirm the old passcode is rejected and the new one works:
-   ```bash
-   curl -i https://bell-api.gatherloop.id/subscriptions \
-     -X POST -H "Content-Type: application/json" \
-     -d '{"subscription":{"endpoint":"https://example/test","keys":{"p256dh":"x","auth":"y"}},"passcode":"<old passcode>"}'
-   # HTTP/1.1 401 Unauthorized
-   ```
-5. Distribute the new passcode to staff through whatever out-of-band channel
-   the team already trusts (it's a shared secret, not per-device — same
-   assumption as v1's install ceremony, per PRD §3.2). Devices already
-   subscribed don't need to do anything; only someone (re)subscribing or
-   unsubscribing from now on needs the new value.
-
-No code or schema change is needed for rotation — the passcode is a single
-env var compared at request time (`src/subscriptions/auth.ts`), never
-persisted.
