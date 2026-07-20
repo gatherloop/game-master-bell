@@ -18,11 +18,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 /**
- * Receives calls pushed to the `game-masters` topic and shows a high-priority
- * notification with the table/floor content (FR-D2), persisting each call so
- * the status screen can list recent calls (FR-D3).
+ * Receives calls pushed to the `game-masters` topic. The API always sends data-only
+ * messages (FR-A2v3) so `message.notification` is never populated here — title/body are
+ * always composed in-app from `message.data` (FR-N2), and the notification is shown on
+ * the custom-sound channel (FR-N2/FR-N4), persisting each call so the status screen can
+ * list recent calls (FR-D3/FR-N5).
  */
 class GameMasterMessagingService : FirebaseMessagingService() {
 
@@ -56,13 +59,12 @@ class GameMasterMessagingService : FirebaseMessagingService() {
 
         val number = message.data["number"]
         val floor = message.data["floor"]
-        val title = message.notification?.title ?: getString(R.string.call_notification_title)
-        val body = message.notification?.body
-            ?: if (number != null && floor != null) {
-                getString(R.string.call_notification_body, number, floor)
-            } else {
-                getString(R.string.call_notification_fallback_body)
-            }
+        val title = getString(R.string.call_notification_title)
+        val body = if (number != null && floor != null) {
+            getString(R.string.call_notification_body, number, floor)
+        } else {
+            getString(R.string.call_notification_fallback_body)
+        }
 
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -81,8 +83,15 @@ class GameMasterMessagingService : FirebaseMessagingService() {
             .setContentIntent(contentIntent)
             .build()
 
-        NotificationManagerCompat.from(this).notify(System.currentTimeMillis().toInt(), notification)
+        NotificationManagerCompat.from(this).notify(notificationId(message), notification)
     }
+
+    /** A unique id per call (FR-N3) so repeated calls stack and each re-alerts, instead of
+     *  a later call silently replacing an earlier unread one. FCM assigns every downstream
+     *  message its own `messageId`; hashing it gives a stable, collision-free-in-practice
+     *  notification id. Falls back to a random id on the rare message without one. */
+    private fun notificationId(message: RemoteMessage): Int =
+        message.messageId?.hashCode() ?: UUID.randomUUID().hashCode()
 
     private fun hasNotificationPermission(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true

@@ -20,6 +20,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.gatherloop.gamemasterbell.receiver.data.Call
 import com.gatherloop.gamemasterbell.receiver.data.CallsRepository
 import com.gatherloop.gamemasterbell.receiver.fcm.GAME_MASTERS_TOPIC
+import com.gatherloop.gamemasterbell.receiver.fcm.deleteRetiredCallNotificationChannels
 import com.gatherloop.gamemasterbell.receiver.fcm.ensureCallNotificationChannel
 import com.gatherloop.gamemasterbell.receiver.ui.StatusScreen
 import com.gatherloop.gamemasterbell.receiver.ui.theme.ReceiverAndroidTheme
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
         notificationsGranted = hasNotificationPermission()
 
         ensureCallNotificationChannel(this)
+        deleteRetiredCallNotificationChannels(this)
         subscribeToGameMastersTopic()
         observeRecentCalls()
 
