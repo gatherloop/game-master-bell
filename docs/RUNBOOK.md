@@ -11,13 +11,10 @@ API** at `apps/api` in this repo, moved in from the standalone
 [apps/api/docs/DEPLOY.md](../apps/api/docs/DEPLOY.md)/[DEPLOY_NATIVE.md](../apps/api/docs/DEPLOY_NATIVE.md)
 for deploy instructions, and [apps/api/docs/RUNBOOK.md](../apps/api/docs/RUNBOOK.md)
 for API-specific ops). The old `game-master-bell-api` repo's deploy workflow
-is kept active as a rollback path until the monorepo-triggered deploy is
-verified on the VPS, per PRD-v3's migration plan.
-
-The receiver PWA still lives in `gatherloop/game-master-bell-receiver` and
-keeps receiving Web Push from its own repo/deploy until every staff phone
-runs the native Android receiver; see that repo's runbook for its deploy/ops
-instructions until the staff migration (PRD-v3 §7) completes.
+was kept active as a rollback path until the monorepo-triggered deploy was
+verified on the VPS; as of phase 10 that verification is long done and the
+old repo's workflow has been removed — see
+[Decommissioning the old repos](#decommissioning-the-old-repos) below.
 
 As of PRD-v3 phase 6, the native Android receiver lives at
 `apps/receiver-android` in this repo (see
@@ -31,10 +28,10 @@ by pushing a `receiver-android-v*` tag) that publishes an installable APK
 to GitHub Releases, and the staff-phone install runbook — see
 [apps/receiver-android/docs/RUNBOOK.md](../apps/receiver-android/docs/RUNBOOK.md)
 for the keystore setup, cutting a release, sideload steps, and the
-battery-optimization/OEM-autostart checklist. The app is not yet
-distributed to staff phones — that's the still-pending staff migration
-(PRD-v3 §7's unnumbered row), which phase 8 makes possible but doesn't
-itself perform.
+battery-optimization/OEM-autostart checklist. The staff migration (PRD-v3
+§7's unnumbered row) is complete: every staff phone runs the native app,
+the receiver PWA is retired, and phase 9 removed the API's Web Push path
+entirely.
 
 ---
 
@@ -154,6 +151,30 @@ release** build instead — see
 [apps/receiver-android/docs/RUNBOOK.md](../apps/receiver-android/docs/RUNBOOK.md)
 for cutting one via `.github/workflows/android-release.yml` and installing
 it.
+
+---
+
+## Decommissioning the old repos
+
+PRD-v3 phase 10, the final phase, retired the two standalone repos that
+predated this monorepo now that the staff migration (PRD-v3 §7) is
+complete and every phone runs the native receiver:
+
+- **`gatherloop/game-master-bell-receiver`** (the Web Push PWA) — its
+  `.github/workflows/deploy.yml` (GitHub Pages) has been removed and its
+  README carries an archive notice pointing here. A repo admin still needs
+  to do two things GitHub only exposes in its UI: **Settings → Pages →
+  Source → None** (to actually take the published site down — removing the
+  workflow alone doesn't un-publish the last build) and **Settings →
+  General → Danger Zone → Archive this repository**.
+- **`gatherloop/game-master-bell-api`** (the pre-monorepo API) — its
+  `.github/workflows/deploy.yml` (the SSH rollback path, superseded by this
+  repo's `deploy-api.yml` since phase 2) has been removed and its README
+  carries an archive notice pointing here. A repo admin still needs to
+  **Settings → General → Danger Zone → Archive this repository**.
+
+Both repos keep their full git history, read-only, for reference. Nothing
+in this monorepo's deploys, CI, or docs depends on either repo anymore.
 
 ---
 
