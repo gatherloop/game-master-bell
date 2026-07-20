@@ -47,3 +47,14 @@ change as a new channel id (bump `table_calls_v2` → `table_calls_v3` in
 `strings.xml`, add the new id to `RETIRED_CHANNEL_IDS` in
 `fcm/CallNotificationChannel.kt`) so `deleteRetiredCallNotificationChannels`
 cleans up the old one on next launch.
+
+## Releasing
+
+No Play Store (PRD-v3 §3.3) — releases are signed APKs published to GitHub
+Releases and sideloaded onto staff phones. Pushing a `receiver-android-v*`
+tag (e.g. `receiver-android-v1.0.0`) runs
+`.github/workflows/android-release.yml`, which builds a signed
+`assembleRelease` and attaches the APK to a matching GitHub Release. See
+[docs/RUNBOOK.md](docs/RUNBOOK.md) for the one-time release-keystore setup,
+the full release checklist, and the staff-phone install + battery/OEM
+autostart checklist.

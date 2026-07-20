@@ -12,5 +12,7 @@ Monorepo layout: `apps/bell-web` (customer bell, GitHub Pages),
 `game-master-bell-api` repo per PRD-v3 phase 2), `packages/shared`
 (`tables.json` + types, imported by both apps), and `apps/receiver-android`
 (native Android receiver, Kotlin + Compose + FCM — resurrected from this
-repo's own v1 history per PRD-v3 phase 6; the custom bell sound and APK
-release land in later phases).
+repo's own v1 history per PRD-v3 phase 6, with a custom bell sound per
+phase 7 and signed APK releases per phase 8; see
+[apps/receiver-android/docs/RUNBOOK.md](apps/receiver-android/docs/RUNBOOK.md)
+for cutting a release and installing it on a staff phone).

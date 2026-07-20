@@ -22,11 +22,19 @@ instructions until the staff migration (PRD-v3 §7) completes.
 As of PRD-v3 phase 6, the native Android receiver lives at
 `apps/receiver-android` in this repo (see
 [apps/receiver-android/README.md](../apps/receiver-android/README.md)),
-restored from this repo's own v1 history. It is not yet distributed to
-staff phones — the custom bell sound (phase 7) and signed APK release
-(phase 8) land in later phases; until then it's built and linted in CI
-(`.github/workflows/android-ci.yml`, `./gradlew lint assembleDebug`) but not
-installed anywhere.
+restored from this repo's own v1 history; it's built and linted in CI
+(`.github/workflows/android-ci.yml`, `./gradlew lint assembleDebug`) on
+every push/PR touching `apps/receiver-android/**`. Phase 7 added the custom
+bell sound (`table_calls_v2` notification channel). Phase 8 added a
+signed-release workflow (`.github/workflows/android-release.yml`, triggered
+by pushing a `receiver-android-v*` tag) that publishes an installable APK
+to GitHub Releases, and the staff-phone install runbook — see
+[apps/receiver-android/docs/RUNBOOK.md](../apps/receiver-android/docs/RUNBOOK.md)
+for the keystore setup, cutting a release, sideload steps, and the
+battery-optimization/OEM-autostart checklist. The app is not yet
+distributed to staff phones — that's the still-pending staff migration
+(PRD-v3 §7's unnumbered row), which phase 8 makes possible but doesn't
+itself perform.
 
 ---
 
@@ -137,12 +145,15 @@ placeholder (see [apps/receiver-android/README.md](../apps/receiver-android/READ
 — enough to build, but a device using it won't receive real pushes until
 it's swapped for the real project's file.
 
-As of phase 6 this is a near-verbatim restore of the reviewed v1 app: no
-custom bell sound yet (still the system default sound on the v1
-`panggilan_meja` channel — phase 7 bundles the sound and bumps the channel
-id) and no signed release build (phase 8). Installing the debug APK on a
-staff phone and subscribing to the `game-masters` topic is enough to see
-the status screen and receive a plain-sound test notification.
+As of phase 7 the app plays the custom bell sound on the `table_calls_v2`
+channel (see [apps/receiver-android/README.md](../apps/receiver-android/README.md#custom-bell-sound)).
+The debug APK above is enough for local testing (install it and subscribe
+to the `game-masters` topic to see the status screen and receive a
+bell-sound test notification), but staff phones should run a **signed
+release** build instead — see
+[apps/receiver-android/docs/RUNBOOK.md](../apps/receiver-android/docs/RUNBOOK.md)
+for cutting one via `.github/workflows/android-release.yml` and installing
+it.
 
 ---
 

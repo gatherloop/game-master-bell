@@ -1,9 +1,22 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
     alias(libs.plugins.ksp)
+}
+
+// Release signing comes from `keystore.properties` (gitignored, never committed — see
+// docs/RUNBOOK.md §1). Local debug builds don't need it; CI writes it from repo secrets
+// before running `assembleRelease` (see .github/workflows/android-release.yml). Without
+// it, `assembleRelease` still works locally but produces an unsigned APK.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -14,10 +27,24 @@ android {
         applicationId = "com.gatherloop.gamemasterbell.receiver"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Overridable by CI (`-PreleaseVersionCode=… -PreleaseVersionName=…`) so a tagged
+        // release's version comes from the git tag instead of a hand-edited constant here —
+        // see docs/RUNBOOK.md §2. Local/CI-less builds fall back to these defaults.
+        versionCode = (project.findProperty("releaseVersionCode") as String?)?.toInt() ?: 1
+        versionName = project.findProperty("releaseVersionName") as String? ?: "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -27,6 +54,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
