@@ -3,8 +3,8 @@
 The API runs as a single Docker container on the VPS, sitting behind a
 reverse proxy that terminates TLS. This mirrors the target architecture in
 [PRD-v3](https://github.com/gatherloop/game-master-bell/blob/main/docs/PRD-v3.md):
-Web Push and the GitHub Pages-hosted callers both require HTTPS, so the
-proxy — not the Node process — holds the certificate.
+the GitHub Pages-hosted bell app calls this API over HTTPS, so the proxy —
+not the Node process — holds the certificate.
 
 **Not the automated path.** `.github/workflows/deploy-api.yml` deploys
 natively via systemd (see [DEPLOY_NATIVE.md](DEPLOY_NATIVE.md)); this guide
@@ -32,28 +32,16 @@ cp .env.example .env
 
 Fill in `.env` with production values:
 
-- `STAFF_PASSCODE` — a shared secret staff enter in the receiver PWA
-  (e.g. `openssl rand -hex 16`). Required — subscription endpoints reject
-  everything with 401 until this is set.
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` — generate a pair with
-  `pnpm install && pnpm run vapid:generate` and paste both values in.
-  `VAPID_PUBLIC_KEY` is served at `GET /vapid-key`; `VAPID_PRIVATE_KEY` signs
-  every outgoing Web Push message and must stay secret.
-- `VAPID_SUBJECT` — a `mailto:` address or `https:` URL push services may use
-  to contact us about this key pair, per the VAPID spec.
 - `FCM_SERVICE_ACCOUNT_PATH` — path to the Firebase service-account JSON used
   to send FCM notifications; see [RUNBOOK.md](RUNBOOK.md#creating-the-firebase-project--service-account)
   for how to obtain it. Place the file at `apps/api/fcm-service-account.json`
   (matching `docker-compose.yml`'s bind mount) and leave the env var at its
   `.env.example` default. Required — the API refuses to start without it
-  (FR-A9), same as the VAPID vars above; it is not yet sent from `POST /call`
-  (PRD-v3 phase 5 wires that up).
+  (FR-A9).
 
-`SUBSCRIPTIONS_DB_PATH` defaults to `./data/subscriptions.db`;
-`docker-compose.yml` mounts a named volume at `/app/apps/api/data` so the
-subscriptions database survives container restarts and redeploys. Table
-data has no on-disk state — it's compiled in from `packages/shared` at
-build time.
+Table data has no on-disk state — it's compiled in from `packages/shared`
+at build time. As of PRD-v3 phase 9 the API keeps no persistent state at
+all, so no data volume is needed.
 
 ## 2. Run the API container
 
@@ -128,63 +116,18 @@ curl https://bell-api.gatherloop.id/healthz
 
 This is the demoable outcome for phase A1.
 
-Phase A3's demoable outcome — a subscription posted with `curl` lands in the
-database, and a wrong passcode is rejected:
+`curl /call` rings every staff phone subscribed to the `game-masters` FCM
+topic (via the native Android receiver, `apps/receiver-android`):
 
 ```bash
-curl -i https://bell-api.gatherloop.id/subscriptions \
+curl -i https://bell-api.gatherloop.id/call \
   -X POST -H "Content-Type: application/json" \
-  -d '{"subscription":{"endpoint":"https://example/test","keys":{"p256dh":"x","auth":"y"}},"passcode":"wrong"}'
-# HTTP/1.1 401 Unauthorized
-
-curl -i https://bell-api.gatherloop.id/subscriptions \
-  -X POST -H "Content-Type: application/json" \
-  -d '{"subscription":{"endpoint":"https://example/test","keys":{"p256dh":"x","auth":"y"}},"passcode":"<your STAFF_PASSCODE>"}'
+  -d '{"tableCode":"2-05"}'
 # HTTP/1.1 200 OK  {"ok":true}
 ```
 
-Phase A4's demoable outcome — `curl /call` rings a real browser subscribed
-by hand via devtools (no receiver PWA needed yet):
-
-1. On a phone or desktop browser, open any HTTPS page and run in devtools:
-
-   ```js
-   const swSource = `
-     self.addEventListener("push", (event) => {
-       const { title, body } = event.data.json();
-       event.waitUntil(self.registration.showNotification(title, { body }));
-     });
-   `;
-   const swUrl = URL.createObjectURL(new Blob([swSource], { type: "text/javascript" }));
-   const registration = await navigator.serviceWorker.register(swUrl);
-   const subscription = await registration.pushManager.subscribe({
-     userVisibleOnly: true,
-     applicationServerKey: "<VAPID_PUBLIC_KEY>",
-   });
-   console.log(JSON.stringify(subscription.toJSON()));
-   ```
-
-2. Register that subscription with the API:
-
-   ```bash
-   curl -i https://bell-api.gatherloop.id/subscriptions \
-     -X POST -H "Content-Type: application/json" \
-     -d '{"subscription": <output of sub.toJSON()>, "passcode": "<your STAFF_PASSCODE>"}'
-   # HTTP/1.1 200 OK  {"ok":true}
-   ```
-
-3. Trigger a call for a real table code and watch the notification appear:
-
-   ```bash
-   curl -i https://bell-api.gatherloop.id/call \
-     -X POST -H "Content-Type: application/json" \
-     -d '{"tableCode":"2-05"}'
-   # HTTP/1.1 200 OK  {"ok":true}
-   ```
-
-Check the container logs (`docker compose logs -f`) for the per-subscription
-`push.send_result` line, and `push.pruned` if a stale subscription gets
-cleaned up.
+Check the container logs (`docker compose logs -f`) for the `fcm.send_result`
+line logging the message id or error (FR-A8).
 
 ## Redeploying
 
@@ -205,6 +148,6 @@ either way, since the app always listens on `127.0.0.1:3000`.
 ## Next steps
 
 Once the API is deployed and verified end to end, see
-[RUNBOOK.md](RUNBOOK.md) for the phase A5 operational work: the Firebase
-project decommission checklist, wiring up uptime monitoring for
-`GET /healthz`, and the staff passcode rotation procedure.
+[RUNBOOK.md](RUNBOOK.md) for creating the Firebase project + service
+account, the (historical) v1 Firebase project decommission checklist, and
+wiring up uptime monitoring for `GET /healthz`.

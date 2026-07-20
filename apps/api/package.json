@@ -2,7 +2,7 @@
   "name": "@game-master-bell/api",
   "private": true,
   "version": "0.0.0",
-  "description": "Self-hosted call API for Game Master Bell (validates bell calls, fans out Web Push notifications)",
+  "description": "Self-hosted call API for Game Master Bell (validates bell calls, fans out FCM notifications)",
   "type": "module",
   "scripts": {
     "predev": "pnpm --filter @game-master-bell/shared build",
@@ -13,22 +13,17 @@
     "typecheck": "tsc -b",
     "pretest": "pnpm --filter @game-master-bell/shared build",
     "test": "vitest run",
-    "vapid:generate": "tsx scripts/generate-vapid-keys.ts",
     "fcm:send-test": "tsx scripts/send-test-fcm.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
     "@game-master-bell/shared": "workspace:*",
-    "better-sqlite3": "^12.11.1",
     "fastify": "^5.6.1",
     "firebase-admin": "^14.2.0",
     "pino": "^10.3.1",
-    "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/web-push": "^3.6.4",
     "vitest": "^4.1.10"
   }
 }

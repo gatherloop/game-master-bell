@@ -2,9 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { Table } from "@game-master-bell/shared";
 import { buildApp, type TablesLookup } from "./app.js";
 import type { FcmSender } from "./fcm/service.js";
-import type { PushSender } from "./push/service.js";
-import type { PushSubscription } from "./subscriptions/schema.js";
-import type { StoredSubscription, SubscriptionStore } from "./subscriptions/store.js";
 
 const activeTable: Table = {
   code: "2-05",
@@ -14,36 +11,9 @@ const activeTable: Table = {
   active: true,
 };
 
-const staffPasscode = "let-me-in";
-
-const sampleSubscription: PushSubscription = {
-  endpoint: "https://push.example/device-1",
-  keys: { p256dh: "p256dh-value", auth: "auth-value" },
-};
-
 function fakeTablesStore(tables: Table[] = [activeTable]): TablesLookup {
   return {
     findByCode: (code) => tables.find((table) => table.code === code && table.active),
-  };
-}
-
-function fakeSubscriptionStore(): SubscriptionStore {
-  const rows = new Map<string, StoredSubscription>();
-  return {
-    upsert(subscription) {
-      rows.set(subscription.endpoint, {
-        endpoint: subscription.endpoint,
-        p256dh: subscription.keys.p256dh,
-        auth: subscription.keys.auth,
-        createdAt: new Date().toISOString(),
-      });
-    },
-    remove(endpoint) {
-      rows.delete(endpoint);
-    },
-    all() {
-      return [...rows.values()];
-    },
   };
 }
 
@@ -110,29 +80,6 @@ describe("POST /call", () => {
     expect(response.json()).toEqual({ ok: true });
   });
 
-  it("fans the call out via the push sender for a known, active table", async () => {
-    const pushSender: PushSender = { sendToAll: vi.fn().mockResolvedValue(undefined) };
-    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/call",
-      payload: { tableCode: "2-05" },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(pushSender.sendToAll).toHaveBeenCalledWith(activeTable);
-  });
-
-  it("does not fan out for an unknown table code", async () => {
-    const pushSender: PushSender = { sendToAll: vi.fn().mockResolvedValue(undefined) };
-    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender });
-
-    await app.inject({ method: "POST", url: "/call", payload: { tableCode: "9-99" } });
-
-    expect(pushSender.sendToAll).not.toHaveBeenCalled();
-  });
-
   it("fans the call out via the FCM sender for a known, active table", async () => {
     const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
     const app = buildApp({ tablesStore: fakeTablesStore(), fcmSender });
@@ -154,47 +101,6 @@ describe("POST /call", () => {
     await app.inject({ method: "POST", url: "/call", payload: { tableCode: "9-99" } });
 
     expect(fcmSender.sendCall).not.toHaveBeenCalled();
-  });
-
-  it("fans out to both Web Push and FCM for the same call", async () => {
-    const pushSender: PushSender = { sendToAll: vi.fn().mockResolvedValue(undefined) };
-    const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
-    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender, fcmSender });
-
-    await app.inject({ method: "POST", url: "/call", payload: { tableCode: "2-05" } });
-
-    expect(pushSender.sendToAll).toHaveBeenCalledWith(activeTable);
-    expect(fcmSender.sendCall).toHaveBeenCalledWith(activeTable);
-  });
-
-  it("still succeeds and still calls FCM when the push sender rejects", async () => {
-    const pushSender: PushSender = { sendToAll: vi.fn().mockRejectedValue(new Error("boom")) };
-    const fcmSender: FcmSender = { sendCall: vi.fn().mockResolvedValue(undefined) };
-    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender, fcmSender });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/call",
-      payload: { tableCode: "2-05" },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(fcmSender.sendCall).toHaveBeenCalledWith(activeTable);
-  });
-
-  it("still succeeds and still calls the push sender when the FCM sender rejects", async () => {
-    const pushSender: PushSender = { sendToAll: vi.fn().mockResolvedValue(undefined) };
-    const fcmSender: FcmSender = { sendCall: vi.fn().mockRejectedValue(new Error("boom")) };
-    const app = buildApp({ tablesStore: fakeTablesStore(), pushSender, fcmSender });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/call",
-      payload: { tableCode: "2-05" },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(pushSender.sendToAll).toHaveBeenCalledWith(activeTable);
   });
 
   it("returns 404 for an unknown table code", async () => {
@@ -238,161 +144,6 @@ describe("POST /call", () => {
       url: "/call",
       headers: { "content-type": "application/json" },
       payload: "{not json",
-    });
-
-    expect(response.statusCode).toBe(400);
-  });
-});
-
-describe("GET /vapid-key", () => {
-  it("returns the configured public key", async () => {
-    const app = buildApp({ vapidPublicKey: "public-key-value" });
-
-    const response = await app.inject({ method: "GET", url: "/vapid-key" });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ publicKey: "public-key-value" });
-  });
-
-  it("returns 500 when no public key is configured", async () => {
-    const app = buildApp();
-
-    const response = await app.inject({ method: "GET", url: "/vapid-key" });
-
-    expect(response.statusCode).toBe(500);
-  });
-});
-
-describe("POST /subscriptions", () => {
-  it("stores the subscription when the passcode is correct", async () => {
-    const subscriptionStore = fakeSubscriptionStore();
-    const app = buildApp({ subscriptionStore, staffPasscode });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/subscriptions",
-      payload: { subscription: sampleSubscription, passcode: staffPasscode },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ ok: true });
-    expect(subscriptionStore.all()).toEqual([
-      expect.objectContaining({
-        endpoint: sampleSubscription.endpoint,
-        p256dh: sampleSubscription.keys.p256dh,
-        auth: sampleSubscription.keys.auth,
-      }),
-    ]);
-  });
-
-  it("is idempotent for the same endpoint", async () => {
-    const subscriptionStore = fakeSubscriptionStore();
-    const app = buildApp({ subscriptionStore, staffPasscode });
-
-    await app.inject({
-      method: "POST",
-      url: "/subscriptions",
-      payload: { subscription: sampleSubscription, passcode: staffPasscode },
-    });
-    await app.inject({
-      method: "POST",
-      url: "/subscriptions",
-      payload: { subscription: sampleSubscription, passcode: staffPasscode },
-    });
-
-    expect(subscriptionStore.all()).toHaveLength(1);
-  });
-
-  it("returns 401 and does not store the subscription when the passcode is wrong", async () => {
-    const subscriptionStore = fakeSubscriptionStore();
-    const app = buildApp({ subscriptionStore, staffPasscode });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/subscriptions",
-      payload: { subscription: sampleSubscription, passcode: "wrong-passcode" },
-    });
-
-    expect(response.statusCode).toBe(401);
-    expect(subscriptionStore.all()).toEqual([]);
-  });
-
-  it("returns 401 when no staff passcode is configured", async () => {
-    const subscriptionStore = fakeSubscriptionStore();
-    const app = buildApp({ subscriptionStore });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/subscriptions",
-      payload: { subscription: sampleSubscription, passcode: "anything" },
-    });
-
-    expect(response.statusCode).toBe(401);
-  });
-
-  it("returns 400 for a malformed body", async () => {
-    const app = buildApp({ subscriptionStore: fakeSubscriptionStore(), staffPasscode });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/subscriptions",
-      payload: { passcode: staffPasscode },
-    });
-
-    expect(response.statusCode).toBe(400);
-  });
-});
-
-describe("DELETE /subscriptions", () => {
-  it("removes the subscription when the passcode is correct", async () => {
-    const subscriptionStore = fakeSubscriptionStore();
-    subscriptionStore.upsert(sampleSubscription);
-    const app = buildApp({ subscriptionStore, staffPasscode });
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: "/subscriptions",
-      payload: { endpoint: sampleSubscription.endpoint, passcode: staffPasscode },
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(subscriptionStore.all()).toEqual([]);
-  });
-
-  it("returns 401 and keeps the subscription when the passcode is wrong", async () => {
-    const subscriptionStore = fakeSubscriptionStore();
-    subscriptionStore.upsert(sampleSubscription);
-    const app = buildApp({ subscriptionStore, staffPasscode });
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: "/subscriptions",
-      payload: { endpoint: sampleSubscription.endpoint, passcode: "wrong-passcode" },
-    });
-
-    expect(response.statusCode).toBe(401);
-    expect(subscriptionStore.all()).toHaveLength(1);
-  });
-
-  it("is idempotent for an unknown endpoint", async () => {
-    const app = buildApp({ subscriptionStore: fakeSubscriptionStore(), staffPasscode });
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: "/subscriptions",
-      payload: { endpoint: "https://push.example/unknown", passcode: staffPasscode },
-    });
-
-    expect(response.statusCode).toBe(200);
-  });
-
-  it("returns 400 for a malformed body", async () => {
-    const app = buildApp({ subscriptionStore: fakeSubscriptionStore(), staffPasscode });
-
-    const response = await app.inject({
-      method: "DELETE",
-      url: "/subscriptions",
-      payload: { passcode: staffPasscode },
     });
 
     expect(response.statusCode).toBe(400);
