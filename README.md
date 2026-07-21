@@ -16,3 +16,11 @@ repo's own v1 history per PRD-v3 phase 6, with a custom bell sound per
 phase 7 and signed APK releases per phase 8; see
 [apps/receiver-android/docs/RUNBOOK.md](apps/receiver-android/docs/RUNBOOK.md)
 for cutting a release and installing it on a staff phone).
+
+**PRD-v3 is complete.** All ten phases have landed: every staff phone runs
+the native receiver, the API's Web Push path was removed in phase 9, and
+the standalone `gatherloop/game-master-bell-api` and
+`gatherloop/game-master-bell-receiver` repos are archived (read-only,
+history preserved) — this monorepo is the only active repo. See
+[docs/RUNBOOK.md](docs/RUNBOOK.md#decommissioning-the-old-repos) for the
+decommission notes.

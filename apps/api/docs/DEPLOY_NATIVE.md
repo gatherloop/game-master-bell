@@ -174,13 +174,12 @@ from the **Actions** tab) to trigger a deploy.
 
 ## Next steps
 
-Once the monorepo-triggered deploy is verified end to end (`GET /healthz`
-on the VPS still responds, and a real `POST /call` still rings a topic-
-subscribed device), disable the old `game-master-bell-api` repo's
-`.github/workflows/deploy.yml` (e.g. delete the file or its secrets) so the
-VPS has exactly one deploy source, per
-[PRD-v3 phase 2](../../../docs/PRD-v3.md#7-implementation-phases). Until
-then, the old repo's workflow is kept as a rollback path. See
-[RUNBOOK.md](RUNBOOK.md) for creating the Firebase project + service
-account, the (historical) v1 Firebase project decommission checklist, and
-wiring up uptime monitoring for `GET /healthz`.
+The monorepo-triggered deploy was verified end to end (`GET /healthz` on
+the VPS responds, and a real `POST /call` rings a topic-subscribed device),
+so this repo's `deploy-api.yml` is the VPS's only deploy source: the old
+`game-master-bell-api` repo's `.github/workflows/deploy.yml` (its rollback
+path) was removed in [PRD-v3 phase 10](../../../docs/PRD-v3.md#7-implementation-phases)
+and that repo is now archived. See [RUNBOOK.md](RUNBOOK.md) for creating
+the Firebase project + service account, the (historical) v1 Firebase
+project decommission checklist, and wiring up uptime monitoring for
+`GET /healthz`.
