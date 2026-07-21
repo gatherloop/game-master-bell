@@ -72,6 +72,13 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        // False positive: fires on any registerForActivityResult call when no
+        // androidx.fragment dependency is declared, but this app uses
+        // ComponentActivity + Compose only, never Fragment/FragmentActivity.
+        disable += "InvalidFragmentVersionForActivityResult"
+    }
 }
 
 dependencies {
