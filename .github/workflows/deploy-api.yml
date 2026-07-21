@@ -53,10 +53,10 @@ jobs:
             corepack enable
             git fetch origin main
             git reset --hard origin/main
-            cat > apps/api/fcm-service-account.json <<'FCM_EOF'
+            cat > fcm-service-account.json <<'FCM_EOF'
             ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
             FCM_EOF
-            cat > apps/api/.env <<'ENV_EOF'
+            cat > .env <<'ENV_EOF'
             FCM_SERVICE_ACCOUNT_PATH=./fcm-service-account.json
             ENV_EOF
             pnpm install --frozen-lockfile
