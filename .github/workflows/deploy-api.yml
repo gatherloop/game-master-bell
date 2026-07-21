@@ -62,7 +62,7 @@ jobs:
             ENV_EOF
             pnpm install --frozen-lockfile
             pnpm --filter @game-master-bell/api build
-            pnpm prune --prod -r
+            (cd apps/api && pnpm prune --prod)
             mkdir -p ~/.config/systemd/user
             cp apps/api/deploy/game-master-bell-api.service ~/.config/systemd/user/
             systemctl --user daemon-reload
