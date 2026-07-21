@@ -45,6 +45,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
+            export CI=true
             export XDG_RUNTIME_DIR=/run/user/$(id -u)
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             export NVM_DIR="$HOME/.nvm"
