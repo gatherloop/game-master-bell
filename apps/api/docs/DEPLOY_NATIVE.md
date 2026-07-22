@@ -113,23 +113,39 @@ systemctl --user restart game-master-bell-api
 
 ## Automated deploys via GitHub Actions
 
-`.github/workflows/deploy-api.yml` (in the `game-master-bell` monorepo)
-runs lint/typecheck/test/build on every push that touches `apps/api/**`,
-`packages/shared/**`, or `pnpm-lock.yaml`, then on `main` SSHes into the
-VPS and runs the same redeploy steps as above, plus (re)writes the VPS's
-`apps/api/.env` from GitHub secrets on every deploy — rotating a secret
-and re-running the workflow is enough to roll it out. It also
+`.github/workflows/deploy-api.yml` (in the `game-master-bell` monorepo) has
+two jobs. `build` runs on a GitHub-hosted runner: lint/typecheck/test/build,
+then `pnpm --filter @game-master-bell/api deploy --prod --legacy` packages
+`apps/api` as a self-contained, production-only directory (`dist/` plus a
+fully resolved `node_modules`, no workspace symlinks back into the monorepo
+store) and uploads it as a build artifact.
+
+`deploy` (on `main` only) downloads that artifact and copies it to the VPS
+over SCP, then SSHes in to `git fetch`/`reset --hard` the checkout (for
+`apps/api/deploy/game-master-bell-api.service` and other tracked files),
+extract the artifact over `apps/api/dist` and `apps/api/node_modules`,
+(re)write `apps/api/.env`/`apps/api/fcm-service-account.json` from GitHub
+secrets, and restart the service. **The VPS never runs `pnpm install` or
+`tsc` itself** — on a 1GB-RAM box, running the workspace install and
+TypeScript build in memory alongside the live API process was enough to
+starve or kill it, which is why the build moved to CI. It also
 (re)installs `apps/api/deploy/game-master-bell-api.service` into
 `~/.config/systemd/user/` and runs `daemon-reload` on every deploy, so
 edits to the unit file in the repo take effect on the next push to `main`
 without any manual step on the VPS.
 
+The ["Redeploying manually"](#redeploying-manually) steps above are
+unaffected — a manual redeploy still builds in place on the VPS, so prefer
+triggering the GitHub Actions workflow (**Actions** tab → **Run workflow**)
+over a manual redeploy when the box is under memory pressure.
+
 ### One-time VPS prep
 
-1. Complete steps 1–2 above once by hand (clone the **monorepo**, configure
-   `apps/api/.env`) so there's a working checkout for the workflow to
-   update. The workflow itself installs the systemd unit and starts the
-   service on its first run.
+1. Complete step 1 above once by hand (clone the **monorepo**) so there's a
+   working checkout for the workflow to update — no need to build
+   (step 2) first, since the workflow ships its own prebuilt artifact and
+   (re)writes `apps/api/.env` itself on every deploy. The workflow installs
+   the systemd unit and starts the service on its first run.
 2. Make sure lingering is enabled for the deploy user
    (`loginctl enable-linger <user>`) — without it, `systemctl --user`
    commands over a non-interactive SSH session have nothing to talk to.
@@ -158,7 +174,7 @@ then update `VPS_DEPLOY_PATH` to the monorepo checkout path:
 | `VPS_PORT`          | SSH port (usually `22`)                                                          |
 | `VPS_USERNAME`      | The deploy user created above                                                    |
 | `VPS_SSH_KEY`       | The **private** key from step 3 (paste the whole file contents)                  |
-| `VPS_DEPLOY_PATH`   | Absolute path to the **monorepo** clone on the VPS, e.g. `/home/deploy/game-master-bell` (not the `apps/api` subdirectory — the deploy script `cd`s there and runs workspace-relative commands) |
+| `VPS_DEPLOY_PATH`   | Absolute path to the **monorepo** clone on the VPS, e.g. `/home/deploy/game-master-bell` (not the `apps/api` subdirectory — the deploy script `cd`s there to update the git checkout, then extracts the prebuilt build artifact into `apps/api/`) |
 | `FCM_SERVICE_ACCOUNT_JSON` | The full contents of the Firebase service-account JSON file (paste the whole file, not a path) — see [RUNBOOK.md](RUNBOOK.md#creating-the-firebase-project--service-account) |
 
 The workflow writes `FCM_SERVICE_ACCOUNT_JSON` to
