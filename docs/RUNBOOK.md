@@ -43,13 +43,15 @@ entirely.
 
 ---
 
-## Deploying the Bell web app (`apps/bell-web`)
+## Deploying the Bell web app (`apps/bell-web`) and docs site (`apps/docs`)
 
 **Current state: automated deploy via GitHub Actions.**
-`.github/workflows/deploy-bell-web.yml` builds and publishes `apps/bell-web`
-to GitHub Pages on every push to `main` that touches `apps/bell-web/`,
-`packages/shared/`, `pnpm-lock.yaml`, or the workflow file itself (also
-runnable manually via `workflow_dispatch`).
+A GitHub repository has exactly one Pages deployment, so `apps/bell-web`
+(customer app, served at the site root) and `apps/docs` (VitePress docs site,
+served under `/docs/`) are built and published together by a single
+`.github/workflows/deploy-pages.yml` workflow, on every push to `main` that
+touches `apps/bell-web/`, `apps/docs/`, `packages/shared/`, `pnpm-lock.yaml`,
+or the workflow file itself (also runnable manually via `workflow_dispatch`).
 
 One-time setup (repo admin):
 
@@ -81,18 +83,26 @@ What the workflow does on each run:
    then `scripts/generate-table-pages.mjs`), producing `apps/bell-web/dist/`
    with one `t/<code>/index.html` per active table plus `404.html` (see PRD
    §"GitHub Pages routing note").
-3. Uploads `apps/bell-web/dist/` as a Pages artifact and deploys it with
+3. Runs `pnpm --filter @game-master-bell/docs build` (`vitepress build`,
+   base `/game-master-bell/docs/`), producing
+   `apps/docs/.vitepress/dist/`.
+4. Assembles one publish directory: `apps/bell-web/dist/` at the root, with
+   `apps/docs/.vitepress/dist/` copied into a `docs/` subfolder — so the
+   bell app keeps serving unchanged at the site root and the docs are
+   available under `/docs/`.
+5. Uploads that directory as a Pages artifact and deploys it with
    `actions/deploy-pages`.
 
-To deploy by hand instead (e.g. for a one-off out-of-band build), set
-`VITE_CALL_API_URL` locally (copy `apps/bell-web/.env.example` to
-`.env.local` and fill it in, or export it in the shell), run
+To deploy the bell app by hand instead (e.g. for a one-off out-of-band
+build), set `VITE_CALL_API_URL` locally (copy `apps/bell-web/.env.example`
+to `.env.local` and fill it in, or export it in the shell), run
 `pnpm --filter @game-master-bell/bell-web build`, and publish the resulting
 `apps/bell-web/dist/` however the repo's configured Pages source expects.
 
 Verify a deploy by opening
 `https://gatherloop.github.io/game-master-bell/t/<code>/` for a known-active
-table code, and confirm an unknown code shows the styled 404 page.
+table code (confirm an unknown code shows the styled 404 page), and
+`https://gatherloop.github.io/game-master-bell/docs/` for the docs site.
 
 ---
 
@@ -102,7 +112,7 @@ As of PRD-v3 phase 3, both `apps/bell-web` and `apps/api` import
 `tables.json` directly from `packages/shared` at build time — there is no
 runtime sync or cache on the API side anymore. A merged edit to
 `packages/shared/src/tables.json` triggers **both** deploy workflows
-(`deploy-bell-web.yml` and `deploy-api.yml` each filter on
+(`deploy-pages.yml` and `deploy-api.yml` each filter on
 `packages/shared/**`), so a table add/rename/(de)activate reaches
 production in one PR, atomically, once both workflows finish — no waiting
 on an hourly refresh.
