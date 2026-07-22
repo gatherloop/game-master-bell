@@ -11,7 +11,7 @@ import com.gatherloop.gamemasterbell.receiver.R
 
 /** Channel ids ever shipped by this app. Android channels are immutable once created — a
  *  sound change means a new id, and the old one is deleted on startup (FR-N4). */
-private val RETIRED_CHANNEL_IDS = listOf("panggilan_meja")
+private val RETIRED_CHANNEL_IDS = listOf("panggilan_meja", "table_calls_v2")
 
 /** Creates the "Panggilan Meja" channel (FR-D4/FR-N4) with the custom bell sound
  *  (`res/raw/bell_call`) if it doesn't already exist. Safe to call repeatedly. */
@@ -25,8 +25,12 @@ fun ensureCallNotificationChannel(context: Context) {
         enableVibration(true)
         setSound(
             bellCallSoundUri(context),
+            // USAGE_NOTIFICATION (not USAGE_NOTIFICATION_EVENT) — matches Android's own
+            // default notification AudioAttributes. Some OEM skins (e.g. Realme UI/ColorOS)
+            // don't route USAGE_NOTIFICATION_EVENT to the notification volume stream and
+            // play it through media volume instead.
             AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build(),
         )
