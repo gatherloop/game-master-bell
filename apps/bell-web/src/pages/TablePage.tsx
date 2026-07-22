@@ -13,6 +13,8 @@ function statusMessage(state: BellCallState): string {
       return `Game master akan segera datang membantumu (${state.secondsRemaining}s)`;
     case "error":
       return "Panggilan gagal, coba lagi";
+    case "outside-area":
+      return "Bel hanya bisa digunakan di dalam kafe";
   }
 }
 
@@ -27,7 +29,7 @@ export function TablePage({ table }: { table: Table }) {
       <BellStage onTap={call} disabled={disabled} />
       <p
         className={
-          state.status === "error"
+          state.status === "error" || state.status === "outside-area"
             ? "table-page__message table-page__message--error"
             : "table-page__message"
         }

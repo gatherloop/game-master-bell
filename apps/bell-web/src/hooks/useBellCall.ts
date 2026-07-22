@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { callGameMaster } from "../lib/callGameMaster";
+import { checkGeofence } from "../lib/geofence";
 
 /** Client-side cooldown after a successful call, per FR-W5. */
 export const COOLDOWN_SECONDS = 60;
@@ -8,7 +9,8 @@ export type BellCallState =
   | { status: "idle" }
   | { status: "calling" }
   | { status: "cooldown"; secondsRemaining: number }
-  | { status: "error" };
+  | { status: "error" }
+  | { status: "outside-area" };
 
 /** Drives the bell tap → call API request → success/error/cooldown flow (FR-W4–W6). */
 export function useBellCall(tableCode: string) {
@@ -44,9 +46,18 @@ export function useBellCall(tableCode: string) {
     if (state.status !== "calling") return;
 
     let cancelled = false;
-    callGameMaster(tableCode)
-      .then(() => {
-        if (!cancelled) startCooldown();
+    // Gate on location first (FR-W10): a confident out-of-area fix blocks the
+    // call; anything uncertain fails open and proceeds. See lib/geofence.ts.
+    checkGeofence()
+      .then((result) => {
+        if (cancelled) return undefined;
+        if (result === "outside") {
+          setState({ status: "outside-area" });
+          return undefined;
+        }
+        return callGameMaster(tableCode).then(() => {
+          if (!cancelled) startCooldown();
+        });
       })
       .catch(() => {
         if (!cancelled) setState({ status: "error" });

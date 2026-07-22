@@ -272,7 +272,22 @@ Bell web app requirements (FR-W1…W9) are unchanged from v1/v2 and not
 restated. API validation requirements FR-A1 (validate + 400/404), FR-A3
 (structured logs), FR-A4 (CORS) carry over unchanged.
 
-### 4.1 Call API
+### 4.1 Bell web app (new in v3)
+
+- **FR-W10** — *Cafe geofence (advisory).* When a cafe latitude/longitude is
+  configured (`VITE_CAFE_LATITUDE`/`VITE_CAFE_LONGITUDE`, optional
+  `VITE_CAFE_RADIUS_METERS`, default 150m), a bell tap first requests the
+  device's location and **blocks the call — showing "Bel hanya bisa digunakan
+  di dalam kafe" — only when the device is confidently outside the radius**
+  (distance minus the reported accuracy exceeds the radius). The check is
+  **fail-open**: a missing config, absent Geolocation API, denied prompt,
+  timeout, or fuzzy fix all let the call proceed. This addresses customers
+  ringing from outside the cafe via a bookmarked/shared table URL. It is a
+  deterrent, not a security control — client coordinates could be spoofed —
+  consistent with the low-stakes threat model (§3.2). See
+  `apps/bell-web/src/lib/geofence.ts`.
+
+### 4.2 Call API
 
 - **FR-A2v3** — On a valid call, the API sends one high-priority **data-only
   FCM message** to the `game-masters` topic with `data` fields `tableCode`,
@@ -289,7 +304,7 @@ restated. API validation requirements FR-A1 (validate + 400/404), FR-A3
   config are removed. A `tables.json` edit reaches production by triggering
   the API deploy workflow.
 
-### 4.2 Receiver Android app
+### 4.3 Receiver Android app
 
 - **FR-N1** — On first launch the app requests notification permission
   (Android 13+) and subscribes to the `game-masters` FCM topic. *(v1 FR-D1.)*

@@ -59,6 +59,19 @@ One-time setup (repo admin):
    (e.g. `https://bell-api.gatherloop.id/call`). The workflow injects it as
    a build-time env var (`vite build` bakes `VITE_*` vars into the static
    bundle, so it must be supplied at build time, not runtime).
+3. *(Optional)* **Cafe geofence** — to stop customers ringing the bell from
+   outside the cafe (the table URL is bookmarkable), add secrets
+   `VITE_CAFE_LATITUDE` and `VITE_CAFE_LONGITUDE` (decimal degrees; in Google
+   Maps, right-click the cafe and copy the `lat, lng` shown at the top) and
+   optionally `VITE_CAFE_RADIUS_METERS` (default `150`). When both coordinates
+   are set, the bell asks the browser for the device's location on tap and
+   blocks the call — showing "Bel hanya bisa digunakan di dalam kafe" — only
+   when the device is *confidently* outside the radius. The check is
+   **advisory and fail-open**: a denied location prompt, missing GPS, timeout,
+   or fuzzy fix all let the call through (coordinates come from client JS and
+   could be spoofed), so it deters casual off-site ringing without blocking
+   real customers. Leave the secrets unset to disable it. See
+   `apps/bell-web/src/lib/geofence.ts`.
 
 What the workflow does on each run:
 
@@ -186,3 +199,4 @@ in this monorepo's deploys, CI, or docs depends on either repo anymore.
 | Table page 404s for a real table | `tables.json` entry missing/inactive, or the web app wasn't rebuilt after a `tables.json` change (static pages are generated at build time, not runtime). |
 | No push received on a game master phone | Check the Android app's status screen for notification-permission/topic-subscription state (`apps/receiver-android`), and the API logs for the `fcm.send_result` outcome of the call (`apps/api`). As of PRD-v3 phase 9 the API sends FCM only — Web Push and the receiver PWA are retired. |
 | QR sticker leads to the 404 page | Table code was deactivated or renamed in `tables.json` without reprinting — regenerate with `pnpm generate-qr` and reprint that table's sticker. |
+| Bell shows "Bel hanya bisa digunakan di dalam kafe" for a customer at a table | Cafe geofence rejected the fix. Confirm `VITE_CAFE_LATITUDE`/`VITE_CAFE_LONGITUDE` point at the cafe and that `VITE_CAFE_RADIUS_METERS` is wide enough for indoor/upper-floor GPS error (try 150–250m). The check fails open, so this only fires on a *confident* out-of-area fix. See `apps/bell-web/src/lib/geofence.ts`. |
