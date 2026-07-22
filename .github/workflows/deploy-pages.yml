@@ -1,13 +1,14 @@
-name: Deploy bell-web to GitHub Pages
+name: Deploy Pages (bell-web + docs)
 
 on:
   push:
     branches: [main]
     paths:
       - "apps/bell-web/**"
+      - "apps/docs/**"
       - "packages/shared/**"
       - "pnpm-lock.yaml"
-      - ".github/workflows/deploy-bell-web.yml"
+      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,10 +40,18 @@ jobs:
           VITE_CAFE_LONGITUDE: ${{ secrets.VITE_CAFE_LONGITUDE }}
           VITE_CAFE_RADIUS_METERS: ${{ secrets.VITE_CAFE_RADIUS_METERS }}
         run: pnpm --filter @game-master-bell/bell-web build
+      - name: Build docs
+        run: pnpm --filter @game-master-bell/docs build
+      - name: Assemble Pages artifact
+        run: |
+          mkdir -p pages-dist
+          cp -r apps/bell-web/dist/. pages-dist/
+          mkdir -p pages-dist/docs
+          cp -r apps/docs/.vitepress/dist/. pages-dist/docs/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/bell-web/dist
+          path: pages-dist
 
   deploy:
     needs: build
