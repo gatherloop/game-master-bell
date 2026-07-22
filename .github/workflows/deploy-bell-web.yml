@@ -35,6 +35,9 @@ jobs:
       - name: Build bell-web
         env:
           VITE_CALL_API_URL: ${{ secrets.VITE_CALL_API_URL }}
+          VITE_CAFE_LATITUDE: ${{ secrets.VITE_CAFE_LATITUDE }}
+          VITE_CAFE_LONGITUDE: ${{ secrets.VITE_CAFE_LONGITUDE }}
+          VITE_CAFE_RADIUS_METERS: ${{ secrets.VITE_CAFE_RADIUS_METERS }}
         run: pnpm --filter @game-master-bell/bell-web build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
