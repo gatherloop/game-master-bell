@@ -8,6 +8,7 @@ coverage/
 *.log
 .env
 .env.local
+.vitepress/cache/
 
 # Firebase service-account JSON (FCM sending credentials) — never commit.
 *fcm-service-account*.json
