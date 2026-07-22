@@ -3,7 +3,10 @@
 Operational reference for shipping changes and running day-to-day tasks for
 Game Master Bell. See `docs/PRD-v3.md` for the current architecture
 (`docs/PRD-v2.md` and `docs/PRD.md` are the superseded v2/v1 specs, kept for
-history).
+history). For an outside-reader introduction to the product and
+architecture, see the [docs site](https://gatherloop.github.io/game-master-bell/docs/)
+(`apps/docs`); this runbook stays the detailed internal operational
+reference the docs site paraphrases and links back to.
 
 As of PRD-v3 phase 2, the production call path is the self-hosted **call
 API** at `apps/api` in this repo, moved in from the standalone
