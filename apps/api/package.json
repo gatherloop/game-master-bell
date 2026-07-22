@@ -4,6 +4,9 @@
   "version": "0.0.0",
   "description": "Self-hosted call API for Game Master Bell (validates bell calls, fans out FCM notifications)",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "predev": "pnpm --filter @game-master-bell/shared build",
     "dev": "tsx watch src/server.ts",
