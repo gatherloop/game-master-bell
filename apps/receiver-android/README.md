@@ -29,9 +29,9 @@ The FCM topic name (`game-masters`) must stay in sync with
 ## Custom bell sound
 
 `app/src/main/res/raw/bell_call.ogg` is the sound registered on the
-`table_calls_v2` notification channel (§3.3, FR-N2) — the reason v3 exists
-at all (browsers can't set a per-notification sound; a native notification
-channel can).
+`table_calls_v3` notification channel (§3.3, FR-N2) — the reason a native
+notification channel exists at all (browsers can't set a per-notification
+sound).
 
 - **Provenance:** an original recording, procedurally synthesized (additive
   synthesis of inharmonic partials with independent exponential decay —
@@ -40,13 +40,14 @@ channel can).
 - **License:** CC0 — public domain, cleared for redistribution (NFR-6).
 - **Specs:** mono, 44.1kHz, ~2.6s, Ogg Vorbis.
 
-Notification channels are immutable once created (a channel's sound can't
-be changed after the fact — Android platform limitation). Replacing this
-file alone does **not** change what installed devices hear; ship a sound
-change as a new channel id (bump `table_calls_v2` → `table_calls_v3` in
-`strings.xml`, add the new id to `RETIRED_CHANNEL_IDS` in
-`fcm/CallNotificationChannel.kt`) so `deleteRetiredCallNotificationChannels`
-cleans up the old one on next launch.
+Notification channels are immutable once created (a channel's sound and
+`AudioAttributes` can't be changed after the fact — Android platform
+limitation). Replacing this file alone does **not** change what installed
+devices hear; ship a sound (or `AudioAttributes`) change as a new channel id
+(bump `table_calls_v3` → `table_calls_v4` in `strings.xml`, add the old id
+to `RETIRED_CHANNEL_IDS` in `fcm/CallNotificationChannel.kt`) so
+`deleteRetiredCallNotificationChannels` cleans up the old one on next
+launch.
 
 ## Releasing
 

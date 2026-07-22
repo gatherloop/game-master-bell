@@ -2,9 +2,10 @@
 <resources>
     <string name="app_name">Game Master Bell</string>
 
-    <!-- Channel ids are immutable once created (sound can't change after the fact), so a
-         sound change ships as a new id; v1/early-v3 used "panggilan_meja" and is retired. -->
-    <string name="call_notification_channel_id" translatable="false">table_calls_v2</string>
+    <!-- Channel ids are immutable once created (sound/AudioAttributes can't change after the
+         fact), so a change ships as a new id; v1/early-v3 used "panggilan_meja" and
+         "table_calls_v2" and are retired. -->
+    <string name="call_notification_channel_id" translatable="false">table_calls_v3</string>
     <string name="call_notification_channel_name">Panggilan Meja</string>
     <string name="call_notification_channel_description">Notifikasi saat ada meja yang memanggil game master</string>
     <string name="call_notification_title">Panggilan Game Master</string>
