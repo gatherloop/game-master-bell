@@ -5,7 +5,10 @@ See `docs/PRD-v3.md` for the current product/architecture spec — native
 Android receiver with a custom bell sound, pushed via FCM from the
 self-hosted call API (`docs/PRD-v2.md` and `docs/PRD.md` are the superseded
 v2/v1 specs, kept for history) — and `docs/RUNBOOK.md` for deploy and
-operational instructions (web app, call API, QR code printing).
+operational instructions (web app, call API, QR code printing). See
+`docs/PRD-docs-site.md` for the plan to publish a public documentation site
+(GitHub Pages, under the `/docs/` sub-path) introducing the product,
+architecture, and tech stack to new engineers, recruiters, and users.
 
 Monorepo layout: `apps/bell-web` (customer bell, GitHub Pages),
 `apps/api` (call API, deployed to our VPS — moved in from the standalone
