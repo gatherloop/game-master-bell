@@ -29,4 +29,8 @@ features:
     details: The interesting engineering trade-offs — why no Firebase, why a native Android receiver, why one monorepo.
     link: /engineering/engineering-decisions
     linkText: Engineering Decisions
+  - title: Explore the repo
+    details: The monorepo layout, plus links to the live app, the source, and the internal PRDs and runbooks.
+    link: /reference/repository-map
+    linkText: Repository Map
 ---

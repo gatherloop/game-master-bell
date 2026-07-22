@@ -1,14 +1,18 @@
 # game-master-bell
 App for calling game master while on coffee shop
 
+**[Read the docs site](https://gatherloop.github.io/game-master-bell/docs/)**
+for an introduction to the product, architecture, tech stack, and the
+engineering decisions behind it — written for new engineers, recruiters, and
+curious users. It's built with VitePress from `apps/docs` (plan:
+`docs/PRD-docs-site.md`) and paraphrases the material below for an outside
+reader; the source of record stays in this repo.
+
 See `docs/PRD-v3.md` for the current product/architecture spec — native
 Android receiver with a custom bell sound, pushed via FCM from the
 self-hosted call API (`docs/PRD-v2.md` and `docs/PRD.md` are the superseded
 v2/v1 specs, kept for history) — and `docs/RUNBOOK.md` for deploy and
-operational instructions (web app, call API, QR code printing). See
-`docs/PRD-docs-site.md` for the plan to publish a public documentation site
-(GitHub Pages, under the `/docs/` sub-path) introducing the product,
-architecture, and tech stack to new engineers, recruiters, and users.
+operational instructions (web app, call API, QR code printing).
 
 Monorepo layout: `apps/bell-web` (customer bell, GitHub Pages),
 `apps/api` (call API, deployed to our VPS — moved in from the standalone
