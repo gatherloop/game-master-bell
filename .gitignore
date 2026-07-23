@@ -12,3 +12,7 @@ coverage/
 
 # Firebase service-account JSON (FCM sending credentials) — never commit.
 *fcm-service-account*.json
+
+# pnpm deploy output (apps/api build artifact packaged for the VPS)
+/api-deploy/
+/api-deploy.tar.gz
