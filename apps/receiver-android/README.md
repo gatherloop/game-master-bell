@@ -37,7 +37,7 @@ sound).
   stasiun"), supplied by the project owner. Confirm redistribution rights
   before a public release (NFR-6) — unlike the original synthesized bell,
   this is not independently known to be CC0.
-- **Specs:** stereo, 44.1kHz, ~9.5s, Ogg Vorbis, ~128kbps.
+- **Specs:** stereo, 44.1kHz, ~9.1s, Ogg Vorbis, ~112kbps.
 
 Notification channels are immutable once created (a channel's sound and
 `AudioAttributes` can't be changed after the fact — Android platform
