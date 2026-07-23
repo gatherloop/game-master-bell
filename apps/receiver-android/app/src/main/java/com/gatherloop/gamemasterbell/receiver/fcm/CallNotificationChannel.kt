@@ -11,7 +11,7 @@ import com.gatherloop.gamemasterbell.receiver.R
 
 /** Channel ids ever shipped by this app. Android channels are immutable once created — a
  *  sound change means a new id, and the old one is deleted on startup (FR-N4). */
-private val RETIRED_CHANNEL_IDS = listOf("panggilan_meja", "table_calls_v2")
+private val RETIRED_CHANNEL_IDS = listOf("panggilan_meja", "table_calls_v2", "table_calls_v3")
 
 /** Creates the "Panggilan Meja" channel (FR-D4/FR-N4) with the custom bell sound
  *  (`res/raw/bell_call`) if it doesn't already exist. Safe to call repeatedly. */
