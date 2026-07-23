@@ -2,11 +2,22 @@
 
 An alternative to [DEPLOY.md](DEPLOY.md) for VPS instances too small for
 Docker's daemon overhead to be worth it for a single lightweight Node
-service (e.g. 512MB RAM or less). The API runs directly under a systemd
-user service instead of a container, sitting behind the same
-TLS-terminating reverse proxy — the app always listens on
+service (e.g. 512MB RAM or less). The API runs directly under a
+**system-level** systemd service instead of a container, sitting behind
+the same TLS-terminating reverse proxy — the app always listens on
 `127.0.0.1:3000` regardless of how it's run, so the proxy setup is
 identical either way.
+
+This deliberately uses a system unit (`/etc/systemd/system/`, managed with
+plain `systemctl`) rather than a per-user unit (`systemctl --user`). An
+earlier version of this guide used a user service, which requires
+`loginctl enable-linger <user>` to survive after the SSH session that
+started it disconnects. In production that turned out to be unreliable —
+the API kept dying minutes after unrelated SSH sessions (including the
+GitHub Actions deploy's own SCP/SSH connections) closed, each time
+resurfacing only when some other session happened to log in and restart
+the user's systemd manager. A system service has no such dependency: it's
+supervised by PID 1 from boot, independent of who is or isn't logged in.
 
 ## Prerequisites
 
@@ -22,9 +33,9 @@ identical either way.
 - A reverse proxy already running (Caddy or nginx) — see
   [DEPLOY.md's "Reverse proxy with TLS"](DEPLOY.md#3-reverse-proxy-with-tls)
   section; it's unchanged by this guide.
-- `loginctl enable-linger <user>` for whichever user will run the service,
-  so its systemd user manager (and the API) keeps running without an
-  active SSH session, and starts again on reboot.
+- The deploy user can run `sudo` (passwordlessly, for non-interactive CI
+  use) to write `/etc/systemd/system/game-master-bell-api.service` and run
+  `systemctl`. If the deploy user is already `root`, this is automatic.
 
 ## 1. Get the code and configure
 
@@ -65,13 +76,12 @@ to what's needed at runtime. Nothing else in the workspace runs from this
 VPS checkout, so pruning the whole tree (rather than just `apps/api`) is
 safe.
 
-## 3. Run as a systemd user service
+## 3. Run as a systemd service
 
 ```bash
-mkdir -p ~/.config/systemd/user
-cp deploy/game-master-bell-api.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable --now game-master-bell-api
+sudo cp deploy/game-master-bell-api.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now game-master-bell-api
 ```
 
 `WorkingDirectory`/`EnvironmentFile` in the unit file point at
@@ -81,22 +91,23 @@ monorepo elsewhere.
 Check it's up:
 
 ```bash
-systemctl --user status game-master-bell-api
+sudo systemctl status game-master-bell-api
 curl http://127.0.0.1:3000/healthz
 # {"status":"ok"}
-journalctl --user -u game-master-bell-api -f   # tail logs
+journalctl -u game-master-bell-api -f   # tail logs
 ```
 
 `Restart=always` in the unit keeps the process supervised across crashes
 and reboots (NFR-2), same guarantee as `restart: always` in the Docker
-compose file.
+compose file. Because this is a system unit (`WantedBy=multi-user.target`),
+it also starts on boot with no linger/session dependency at all.
 
 ## 4. Reverse proxy with TLS, and verifying end to end
 
 Identical to the Docker guide — see DEPLOY.md's
 ["Reverse proxy with TLS"](DEPLOY.md#3-reverse-proxy-with-tls) and
 ["Verify end to end"](DEPLOY.md#4-verify-end-to-end) sections. Swap
-`docker compose logs -f` for `journalctl --user -u game-master-bell-api -f`
+`docker compose logs -f` for `journalctl -u game-master-bell-api -f`
 when checking for the `fcm.send_result` log line.
 
 ## Redeploying manually
@@ -108,7 +119,7 @@ git pull
 pnpm install --frozen-lockfile
 pnpm --filter @game-master-bell/api build
 pnpm prune --prod
-systemctl --user restart game-master-bell-api
+sudo systemctl restart game-master-bell-api
 ```
 
 ## Automated deploys via GitHub Actions
@@ -130,9 +141,9 @@ secrets, and restart the service. **The VPS never runs `pnpm install` or
 TypeScript build in memory alongside the live API process was enough to
 starve or kill it, which is why the build moved to CI. It also
 (re)installs `apps/api/deploy/game-master-bell-api.service` into
-`~/.config/systemd/user/` and runs `daemon-reload` on every deploy, so
-edits to the unit file in the repo take effect on the next push to `main`
-without any manual step on the VPS.
+`/etc/systemd/system/` (via `sudo`) and runs `daemon-reload` on every
+deploy, so edits to the unit file in the repo take effect on the next push
+to `main` without any manual step on the VPS.
 
 The ["Redeploying manually"](#redeploying-manually) steps above are
 unaffected — a manual redeploy still builds in place on the VPS, so prefer
@@ -146,9 +157,10 @@ over a manual redeploy when the box is under memory pressure.
    (step 2) first, since the workflow ships its own prebuilt artifact and
    (re)writes `apps/api/.env` itself on every deploy. The workflow installs
    the systemd unit and starts the service on its first run.
-2. Make sure lingering is enabled for the deploy user
-   (`loginctl enable-linger <user>`) — without it, `systemctl --user`
-   commands over a non-interactive SSH session have nothing to talk to.
+2. Make sure the deploy user can run `sudo systemctl`/`sudo cp` into
+   `/etc/systemd/system/` without a password prompt (needed for the
+   non-interactive SSH deploy step) — automatic if the deploy user is
+   `root`, otherwise add a sudoers entry for those commands.
 3. Generate a dedicated SSH key pair for GitHub Actions and add the
    **public** key to that user's `~/.ssh/authorized_keys` on the VPS:
 
