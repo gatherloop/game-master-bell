@@ -73,7 +73,6 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            export XDG_RUNTIME_DIR=/run/user/$(id -u)
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             git fetch origin main
             git reset --hard origin/main
@@ -87,8 +86,7 @@ jobs:
             cat > apps/api/.env <<'ENV_EOF'
             FCM_SERVICE_ACCOUNT_PATH=./fcm-service-account.json
             ENV_EOF
-            mkdir -p ~/.config/systemd/user
-            cp apps/api/deploy/game-master-bell-api.service ~/.config/systemd/user/
-            systemctl --user daemon-reload
-            systemctl --user enable game-master-bell-api
-            systemctl --user restart game-master-bell-api
+            sudo cp apps/api/deploy/game-master-bell-api.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable game-master-bell-api
+            sudo systemctl restart game-master-bell-api
