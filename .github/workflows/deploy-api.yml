@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +31,39 @@ jobs:
       - run: pnpm --filter @game-master-bell/api test
       - run: pnpm --filter @game-master-bell/api build
 
+      # Package a self-contained, prod-only copy of apps/api (dist/ +
+      # resolved node_modules, no workspace symlinks) so the VPS never has
+      # to run `pnpm install`/`tsc` itself — see apps/api/docs/DEPLOY_NATIVE.md.
+      # --legacy is required because this workspace doesn't set
+      # inject-workspace-packages=true.
+      - run: pnpm --filter @game-master-bell/api deploy --prod --legacy api-deploy
+      - run: tar -czf api-deploy.tar.gz -C api-deploy .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-deploy
+          path: api-deploy.tar.gz
+          retention-days: 1
+
   deploy:
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-deploy
+
+      - name: Copy build artifact to VPS
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "api-deploy.tar.gz"
+          target: "/tmp"
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -45,24 +73,20 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            export CI=true
             export XDG_RUNTIME_DIR=/run/user/$(id -u)
             cd ${{ secrets.VPS_DEPLOY_PATH }}
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            nvm install
-            corepack enable
             git fetch origin main
             git reset --hard origin/main
+            rm -rf apps/api/dist apps/api/node_modules
+            mkdir -p apps/api
+            tar -xzf /tmp/api-deploy.tar.gz -C apps/api
+            rm -f /tmp/api-deploy.tar.gz
             cat > apps/api/fcm-service-account.json <<'FCM_EOF'
             ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
             FCM_EOF
             cat > apps/api/.env <<'ENV_EOF'
             FCM_SERVICE_ACCOUNT_PATH=./fcm-service-account.json
             ENV_EOF
-            pnpm install --frozen-lockfile
-            pnpm --filter @game-master-bell/api build
-            (cd apps/api && pnpm prune --prod)
             mkdir -p ~/.config/systemd/user
             cp apps/api/deploy/game-master-bell-api.service ~/.config/systemd/user/
             systemctl --user daemon-reload
